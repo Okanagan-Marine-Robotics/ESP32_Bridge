@@ -2,6 +2,9 @@ import serial
 import argparse
 from python_library.pubsub import Subscriber, Publisher
 import time
+# import gui libraries
+import tkinter as tk
+import threading
 
 def serial_gen(port, baudrate):
     ser = serial.Serial(port, baudrate, timeout=1)
@@ -14,9 +17,13 @@ def serial_gen(port, baudrate):
 
 def ping(data, publisher):
     print(f"Pong received: {data}")
-    time.sleep(1)  # Simulate some processing delay
+    # time.sleep(1)  # Simulate some processing delay
     print("Sending ping back")
-    publisher.publish(1, {"data": "ping"})
+    publisher.publish(1, {"data": "ping", "timestamp": time.time()})
+
+def received(data):
+    print(f"Data received: {data}")
+
 
 
 def main():
@@ -30,20 +37,51 @@ def main():
     data_generator = serial_gen(args.serial_port, args.baudrate)
     subscriber = Subscriber(data_generator)
     subscriber.subscribe(1, lambda data: ping(data, publisher))
+    subscriber.subscribe(2, lambda data: received(data))
 
-    publisher.publish(1, {"data": "ping"})
+    # create a simple GUI to allow for a user to send commands
+    root = tk.Tk()
+    root.title("Serial Port Tester")
+    root.geometry("600x400")
+    label = tk.Label(root, text="Press Ctrl+C to exit")
+    label.pack(pady=20)
+    button = tk.Button(root, text="Send Ping", command=lambda: publisher.publish(1, {"data": "ping"}))
+    button.pack(pady=10)
 
-    while True:
-        try:
-            subscriber.feed()
+    # add a slider that sends signals to the serial port when moved
+    slider = tk.Scale(root, from_=0, to=100, orient=tk.HORIZONTAL, label="Motor Speed")
+    slider.pack(pady=10)
+
+    def on_slider_change(value):
+        publisher.publish(3, {"speed": int(value)})
+        print(f"Motor speed set to: {value}")
+
+    slider.config(command=on_slider_change)
+
+    
 
 
-        except KeyboardInterrupt:
-            print("Exiting...")
-            break
-        except Exception as e:
-            print(f"Error in Subscriber run loop: {e}")
-            continue
+    def on_close():
+        print("Closing application...")
+        root.destroy()
+        exit(0)
+
+    def subscriber_loop():
+        while True:
+            try:
+                subscriber.feed()
+            except KeyboardInterrupt:
+                print("Exiting subscriber thread...")
+                break
+            except Exception as e:
+                print(f"Error in Subscriber run loop: {e}")
+                continue
+
+    subscriber_thread = threading.Thread(target=subscriber_loop, daemon=True)
+    subscriber_thread.start()
+
+    root.protocol("WM_DELETE_WINDOW", on_close)
+    root.mainloop()
 
 if __name__ == "__main__":
     main()

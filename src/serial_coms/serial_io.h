@@ -6,6 +6,8 @@
 #include <unordered_map>
 #include <vector>
 
+#define LED_PIN 2 // Built-in LED on many ESP32 boards
+
 // Callback function type for subscription
 using SubscriptionCallback = void (*)(JsonDocument &doc);
 

@@ -23,6 +23,7 @@ class Subscriber:
 
     def _process_packet(self, packet: bytes):
         """Decode, validate, and unpack a single COBS-framed packet."""
+        print(packet.hex())
         try:
             decoded = cobs.decode(packet)
 
@@ -56,6 +57,9 @@ class Subscriber:
 
                 while 0x00 in self.buffer:
                     idx = self.buffer.index(0x00)
+                    if idx == 0:
+                        self.buffer = self.buffer[1:]
+                        continue
                     packet = self.buffer[:idx]
                     self.buffer = self.buffer[idx + 1:]
 

@@ -3,10 +3,12 @@
 #include "msgpack_transcoder.h"
 #include "crc8_calc.h"
 #include "cobs_transcoder.h"
+#include "MycilaWebSerial.h"
 
 // Serial port configuration
 #define ESP32_SERIAL Serial
 #define ESP32_BAUDRATE 115200
+extern WebSerial webSerial;
 
 void SerialIO::subscribe(uint8_t channel, Callback cb)
 {
@@ -15,6 +17,7 @@ void SerialIO::subscribe(uint8_t channel, Callback cb)
 
 void SerialIO::publish(int channel, const JsonDocument &doc)
 {
+    digitalWrite(LED_PIN, HIGH); // Turn on the LED to indicate activity
     auto msgpackdata = encodeToMsgPack(doc);
     // add channel information to the beginning of the message
     std::vector<uint8_t> message;
@@ -42,6 +45,7 @@ void SerialIO::publish(int channel, const JsonDocument &doc)
     // }
     // write the encoded message to the serial port
     write(encoded_message.data(), encoded_message.size());
+    digitalWrite(LED_PIN, LOW); // Turn off the LED after sending
     return;
 }
 
@@ -49,9 +53,12 @@ void SerialIO::updateSubscriber()
 {
     while (available())
     {
+        digitalWrite(LED_PIN, HIGH); // Turn on the LED to indicate activity
         int b = read();
         if (b < 0)
+        {
             break;
+        }
 
         uint8_t byte = static_cast<uint8_t>(b);
         if (byte == 0x00)
@@ -68,13 +75,14 @@ void SerialIO::updateSubscriber()
             _buffer.push_back(byte);
         }
     }
+    digitalWrite(LED_PIN, LOW); // Turn off the LED if no data is available
 }
 
 void SerialIO::_processPacket(const std::vector<uint8_t> &packet)
 {
     if (packet.size() < 3)
     {
-        Serial.println("Packet too short");
+        webSerial.println("Packet too short");
         return;
     }
 
@@ -83,7 +91,7 @@ void SerialIO::_processPacket(const std::vector<uint8_t> &packet)
 
     if (crc8(message.data(), message.size()) != received_crc)
     {
-        Serial.println("CRC mismatch");
+        webSerial.println("CRC mismatch");
         return;
     }
 
@@ -94,7 +102,7 @@ void SerialIO::_processPacket(const std::vector<uint8_t> &packet)
 
     if (!decodeFromMsgPack(payload.data(), payload.size(), doc))
     {
-        Serial.println("MsgPack decoding failed");
+        webSerial.println("MsgPack decoding failed");
         return;
     }
 
@@ -107,6 +115,8 @@ void SerialIO::_processPacket(const std::vector<uint8_t> &packet)
 
 void SerialIO::begin()
 {
+    // Set led pin to output
+    pinMode(LED_PIN, OUTPUT);
     ESP32_SERIAL.begin(ESP32_BAUDRATE);
     while (!ESP32_SERIAL)
     {
