@@ -25,7 +25,7 @@ void motorControlTask(void *parameter)
         if (xQueueReceive(motorQueue, &doc, portMAX_DELAY) == pdPASS)
         {
 
-            if (doc->containsKey("esc"))
+            if ((*doc)["esc"].is<JsonObject>())
             {
                 JsonObject esc = (*doc)["esc"].as<JsonObject>();
                 // Iterate only over present keys to avoid unnecessary lookups
