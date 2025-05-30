@@ -1,1 +1,9 @@
 .pio
+sdkconfig.esp32dev
+.vscode
+
+# Ignore CMake files
+CMakeCache.txt
+CMakeFiles/
+CMakeLists.txt.user
+**/CMakeLists.txt

@@ -1,2 +1,0 @@
-poly = 0x07
-init_value = 0x00

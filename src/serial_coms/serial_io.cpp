@@ -4,11 +4,11 @@
 #include "crc8_calc.h"
 #include "cobs_transcoder.h"
 #include "MycilaWebSerial.h"
+#include "configuration.h"
 
 // Serial port configuration
 #define ESP32_SERIAL Serial
 #define ESP32_BAUDRATE 115200
-extern WebSerial webSerial;
 
 void SerialIO::subscribe(uint8_t channel, Callback cb)
 {
@@ -82,7 +82,7 @@ void SerialIO::_processPacket(const std::vector<uint8_t> &packet)
 {
     if (packet.size() < 3)
     {
-        webSerial.println("Packet too short");
+        LOG_WEBSERIALLN("Packet too short");
         return;
     }
 
@@ -91,7 +91,7 @@ void SerialIO::_processPacket(const std::vector<uint8_t> &packet)
 
     if (crc8(message.data(), message.size()) != received_crc)
     {
-        webSerial.println("CRC mismatch");
+        LOG_WEBSERIALLN("CRC mismatch");
         return;
     }
 
@@ -100,9 +100,17 @@ void SerialIO::_processPacket(const std::vector<uint8_t> &packet)
 
     JsonDocument doc; // Adjust size as needed
 
+    // print payload as hex to webserial if debugging is needed
+    // webSerial.print("Payload: ");
+    // for (const auto &byte : payload)
+    // {
+    //     webSerial.print(byte, HEX);
+    //     webSerial.print(" ");
+    // }
+
     if (!decodeFromMsgPack(payload.data(), payload.size(), doc))
     {
-        webSerial.println("MsgPack decoding failed");
+        LOG_WEBSERIALLN("MsgPack decoding failed");
         return;
     }
 
