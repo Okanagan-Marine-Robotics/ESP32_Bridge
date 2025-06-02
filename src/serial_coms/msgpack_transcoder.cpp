@@ -1,16 +1,26 @@
 #include <ArduinoJson.h>
 #include <vector>
+#include "configuration.h"
 
 // Encode ArduinoJson document to MessagePack
 std::vector<uint8_t> encodeToMsgPack(const JsonDocument &doc)
 {
+
+    // Check if the document is empty
+    if (doc.isNull() || doc.size() == 0)
+    {
+        LOG_WEBSERIALLN("Document is empty, returning empty vector.");
+    }
+
+    // Estimate the required size and preallocate the buffer
+    size_t estimatedSize = measureMsgPack(doc);
     std::vector<uint8_t> buffer;
-    buffer.reserve(256); // Reserve initial space to avoid reallocations
-                         // Reserve some space to avoid reallocations
+    buffer.reserve(estimatedSize);
+
+    // Use a lambda to write directly to the buffer
     struct VectorWriter : public Print
     {
         std::vector<uint8_t> &buffer;
-
         VectorWriter(std::vector<uint8_t> &buf) : buffer(buf) {}
 
         size_t write(uint8_t byte) override
@@ -18,7 +28,6 @@ std::vector<uint8_t> encodeToMsgPack(const JsonDocument &doc)
             buffer.push_back(byte);
             return 1;
         }
-
         size_t write(const uint8_t *data, size_t size) override
         {
             buffer.insert(buffer.end(), data, data + size);
@@ -27,7 +36,6 @@ std::vector<uint8_t> encodeToMsgPack(const JsonDocument &doc)
     };
 
     VectorWriter writer(buffer);
-    // Serialize the JsonDocument to MessagePack format into the buffer
     serializeMsgPack(doc, writer);
     return buffer;
 }

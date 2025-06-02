@@ -17,7 +17,7 @@ void motorControlTask(void *parameter)
     JsonDocument *doc;
     for (;;)
     {
-        if (xQueueReceive(motorQueue, &doc, 10) == pdPASS)
+        if (xQueueReceive(motorQueue, &doc, portMAX_DELAY) == pdPASS)
         {
             for (JsonPair kv : (*doc).as<JsonObject>())
             {
@@ -26,7 +26,7 @@ void motorControlTask(void *parameter)
                 {
                     float throttle = kv.value().as<float>();
                     escDrivers[idx]->setThrottle(throttle);
-                    LOG_WEBSERIALLN("ESC " + String(idx) + " set to " + String(throttle));
+                    // LOG_WEBSERIALLN("ESC " + String(idx) + " set to " + String(throttle));
                 }
             }
             delete doc;

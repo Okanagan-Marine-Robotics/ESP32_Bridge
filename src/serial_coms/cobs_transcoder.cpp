@@ -43,7 +43,6 @@ namespace cobs_transcoder
         return output;
     }
 
-    // COBS decode
     std::vector<uint8_t> decode(const std::vector<uint8_t> &input)
     {
         std::vector<uint8_t> output;
@@ -52,7 +51,7 @@ namespace cobs_transcoder
         while (idx < input.size())
         {
             uint8_t code = input[idx];
-            if (code == 0 || idx + code > input.size() + 1)
+            if (code == 0 || idx + code - 1 >= input.size())
             {
                 // Invalid COBS stream
                 return {};
@@ -69,7 +68,7 @@ namespace cobs_transcoder
                 output.push_back(0);
             }
         }
+
         return output;
     }
-
 } // namespace cobs_transcoder

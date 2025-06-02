@@ -6,10 +6,6 @@
 #include "MycilaWebSerial.h"
 #include "configuration.h"
 
-// Serial port configuration
-#define ESP32_SERIAL Serial
-#define ESP32_BAUDRATE 115200
-
 void SerialIO::subscribe(uint8_t channel, Callback cb)
 {
     _callbacks[channel] = cb;
@@ -51,16 +47,11 @@ void SerialIO::publish(int channel, const JsonDocument &doc)
 
 void SerialIO::updateSubscriber()
 {
-    while (available())
+    bool activity = false;
+    uint8_t byte;
+    while (xQueueReceive(_rxQueue, &byte, 0) == pdTRUE)
     {
-        digitalWrite(LED_PIN, HIGH); // Turn on the LED to indicate activity
-        int b = read();
-        if (b < 0)
-        {
-            break;
-        }
-
-        uint8_t byte = static_cast<uint8_t>(b);
+        activity = true;
         if (byte == 0x00)
         {
             if (!_buffer.empty())
@@ -73,9 +64,24 @@ void SerialIO::updateSubscriber()
         else
         {
             _buffer.push_back(byte);
+
+            if (_buffer.size() > MAX_SERIAL_BUFFER_SIZE)
+            {
+                LOG_WEBSERIALLN("Buffer overflow, clearing buffer");
+                _buffer.clear();
+            }
+        }
+
+        // Check if incoming serial data is flooding beyond threshold
+        if (ESP32_SERIAL.available() > MAX_SERIAL_BUFFER_SIZE)
+        {
+            LOG_WEBSERIALLN("Serial buffer overflow, clearing buffers");
+            ESP32_SERIAL.flush(); // Flush unread data
+            _buffer.clear();      // Reset internal buffer
+            break;                // Prevent further processing
         }
     }
-    digitalWrite(LED_PIN, LOW); // Turn off the LED if no data is available
+    digitalWrite(LED_PIN, activity ? HIGH : LOW);
 }
 
 void SerialIO::_processPacket(const std::vector<uint8_t> &packet)
@@ -123,28 +129,22 @@ void SerialIO::_processPacket(const std::vector<uint8_t> &packet)
 
 void SerialIO::begin()
 {
-    // Set led pin to output
     pinMode(LED_PIN, OUTPUT);
     ESP32_SERIAL.begin(ESP32_BAUDRATE);
-    while (!ESP32_SERIAL)
-    {
-        ; // Wait for serial port to connect. Needed for native USB
-    }
-    return;
+
+    _rxQueue = xQueueCreate(512, sizeof(uint8_t)); // Adjust size as needed
+
+    // Attach interrupt handler
+    ESP32_SERIAL.onReceive(onUartRx, this, 1); // 1 = trigger on every byte
+    ESP32_SERIAL.listen();
 }
 
 size_t SerialIO::write(const uint8_t *buffer, size_t size)
 {
-    return ESP32_SERIAL.write(buffer, size);
-}
-
-int SerialIO::read()
-{
-    if (ESP32_SERIAL.available())
-    {
-        return ESP32_SERIAL.read();
-    }
-    return -1;
+    auto ret = ESP32_SERIAL.write(buffer, size);
+    ESP32_SERIAL.flush(); // Ensure all data is sent before returning
+    // clear the buffer
+    return ret;
 }
 
 size_t SerialIO::readBytes(uint8_t *buffer, size_t length)
@@ -161,4 +161,17 @@ void SerialIO::flush()
 {
     ESP32_SERIAL.flush();
     return;
+}
+
+void IRAM_ATTR SerialIO::onUartRx(void *arg)
+{
+    SerialIO *self = static_cast<SerialIO *>(arg);
+    while (ESP32_SERIAL.available())
+    {
+        uint8_t byte = ESP32_SERIAL.read();
+        BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+        xQueueSendFromISR(self->_rxQueue, &byte, &xHigherPriorityTaskWoken);
+        if (xHigherPriorityTaskWoken)
+            portYIELD_FROM_ISR();
+    }
 }

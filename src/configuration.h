@@ -1,4 +1,17 @@
 #pragma once
+#include <MycilaWebSerial.h>
+
+extern WebSerial webSerial; // Forward declaration for WebSerial
+
+/************************
+ * SERIAL CONFIGURATION *
+ ************************/
+
+#define ESP32_SERIAL Serial
+#define ESP32_BAUDRATE 115200
+#define MAX_SERIAL_BUFFER_SIZE 1024 // Maximum size of the serial buffer
+#define CRC8_POLY 0x07
+#define CRC8_INIT_VALUE 0x00
 
 /*********************
  * ESC CONFIGURATION *
@@ -15,7 +28,7 @@
 /**********************
  * WIFI CONFIGURATION *
  **********************/
-#define WIFI_ENABLED false // Enable/disable WiFi
+#define WIFI_ENABLED true // Enable/disable WiFi
 
 #if WIFI_ENABLED
 #define WIFI_SSID "ESP Bridge"   // WiFi SSID
@@ -25,7 +38,8 @@
 /***************************
  * WEBSERIAL CONFIGURATION *
  ***************************/
-#define USE_WEBSERIAL false // Enable/disable WebSerial debug
+#define USE_WEBSERIAL true     // Enable/disable WebSerial debug
+#define LOG_LEVEL ESP_LOG_INFO // Default log level for WebSerial
 
 #if !WIFI_ENABLED && USE_WEBSERIAL
 #error "WebSerial requires WiFi to be enabled. Please set WIFI_ENABLED to true."
@@ -45,10 +59,13 @@
  **********************/
 #define MOTOR_QUEUE_SIZE 10        // Motor control queue size
 #define MOTOR_TASK_STACK_SIZE 4096 // Stack size for motor control task
-#define MOTOR_TASK_PRIORITY 9      // Priority for motor control task
+#define MOTOR_TASK_PRIORITY 1      // Priority for motor control task
 
 // Signaling control tasks are used for obtaining and processing signaling data.
 // this included pinging the esp32, getting memory usage, and other miscellaneous tasks.
-#define SIGNALING_QUEUE_SIZE 5         // Signaling control queue size
-#define SIGNALING_TASK_STACK_SIZE 2048 // Stack size for signaling control task
-#define SIGNALING_TASK_PRIORITY 1      // Priority for signaling control task
+#define SIGNALING_QUEUE_SIZE 10            // Signaling control queue size
+#define SIGNALING_TASK_STACK_SIZE 4096 * 2 // Stack size for signaling control task
+#define SIGNALING_TASK_PRIORITY 1          // Priority for signaling control task
+
+#define SERIAL_TASK_STACK_SIZE 4096 * 2 // Stack size for serial task
+#define SERIAL_TASK_PRIORITY 1          // Priority for serial task
