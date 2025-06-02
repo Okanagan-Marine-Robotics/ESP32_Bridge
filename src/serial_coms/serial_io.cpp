@@ -131,12 +131,6 @@ void SerialIO::begin()
 {
     pinMode(LED_PIN, OUTPUT);
     ESP32_SERIAL.begin(ESP32_BAUDRATE);
-
-    _rxQueue = xQueueCreate(512, sizeof(uint8_t)); // Adjust size as needed
-
-    // Attach interrupt handler
-    ESP32_SERIAL.onReceive(onUartRx, this, 1); // 1 = trigger on every byte
-    ESP32_SERIAL.listen();
 }
 
 size_t SerialIO::write(const uint8_t *buffer, size_t size)

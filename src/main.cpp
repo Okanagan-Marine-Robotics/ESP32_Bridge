@@ -51,8 +51,6 @@ void serialTask(void *parameter)
 
 void setup()
 {
-
-    ESP32_SERIAL.begin(ESP32_BAUDRATE); // Initialize serial port for debugging
     while (!ESP32_SERIAL)
     {
         vTaskDelay(100 / portTICK_PERIOD_MS); // Wait for serial port to connect. Needed for native USB
