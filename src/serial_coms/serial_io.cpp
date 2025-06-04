@@ -13,10 +13,25 @@ void SerialIO::subscribe(uint8_t channel, Callback cb)
 
 void SerialIO::publish(int channel, const JsonDocument &doc)
 {
+
+    if (doc.isNull() || doc.size() == 0) {
+        LOG_WEBSERIALLN("Warning: Tried to publish empty JsonDocument");
+        return;
+    }
+
+
     digitalWrite(LED_PIN, HIGH); // Turn on the LED to indicate activity
     auto msgpackdata = encodeToMsgPack(doc);
     // add channel information to the beginning of the message
     std::vector<uint8_t> message;
+
+        LOG_WEBSERIALLN("Raw Message:");
+    for (auto b : message) {
+        webSerial.printf("%02X ", b);
+    }
+    webSerial.println();
+
+
     message.push_back(static_cast<uint8_t>(channel));
     message.insert(message.end(), msgpackdata.begin(), msgpackdata.end());
 
@@ -109,6 +124,7 @@ void SerialIO::_processPacket(const std::vector<uint8_t> &packet)
     // print payload as hex to webserial if debugging is needed
     // webSerial.print("Payload: ");
     // for (const auto &byte : payload)
+    
     // {
     //     webSerial.print(byte, HEX);
     //     webSerial.print(" ");
@@ -136,8 +152,10 @@ void SerialIO::begin()
 size_t SerialIO::write(const uint8_t *buffer, size_t size)
 {
     auto ret = ESP32_SERIAL.write(buffer, size);
-    ESP32_SERIAL.flush(); // Ensure all data is sent before returning
-    // clear the buffer
+    if (ret != size) {
+        LOG_WEBSERIALLN("Warning: Not all bytes written!");
+    }
+    ESP32_SERIAL.flush(); 
     return ret;
 }
 
