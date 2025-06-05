@@ -1,6 +1,7 @@
 .pio
 sdkconfig.esp32dev
 .vscode
+.cache
 
 # Ignore CMake files
 CMakeCache.txt

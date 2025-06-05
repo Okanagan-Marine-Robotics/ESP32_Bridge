@@ -131,6 +131,16 @@ void SerialIO::begin()
 {
     pinMode(LED_PIN, OUTPUT);
     ESP32_SERIAL.begin(ESP32_BAUDRATE);
+    _rxQueue = xQueueCreate(512, sizeof(uint8_t));
+}
+
+void SerialIO::pollSerialToQueue()
+{
+    while (ESP32_SERIAL.available())
+    {
+        uint8_t byte = ESP32_SERIAL.read();
+        xQueueSend(_rxQueue, &byte, 0); // Non-blocking
+    }
 }
 
 size_t SerialIO::write(const uint8_t *buffer, size_t size)
