@@ -44,7 +44,7 @@ void signalingTask(void *parameter)
 
     for (;;)
     {
-        if (xQueueReceive(signalQueue, &doc, pdMS_TO_TICKS(10)) == pdPASS && doc != nullptr)
+        if (xQueueReceive(signalQueue, &doc, pdMS_TO_TICKS(20)) == pdPASS && doc != nullptr)
         {
             // get the command type from the document
             String commandType = (*doc)["cmd"] | "unknown";

@@ -48,13 +48,6 @@ void SerialIO::publish(int channel, const JsonDocument &doc)
     // append 0x00 byte to the end of the encoded message
     encoded_message.push_back(0x00);
 
-    // print the encoded message for debugging in hex
-    // Serial.print("Encoded message: ");
-    // for (const auto &byte : encoded_message)
-    // {
-    //     Serial.print(byte, HEX);
-    //     Serial.print(" ");
-    // }
     // write the encoded message to the serial port
     write(encoded_message.data(), encoded_message.size());
     digitalWrite(LED_PIN, LOW); // Turn off the LED after sending
@@ -122,15 +115,6 @@ void SerialIO::_processPacket(const std::vector<uint8_t> &packet)
 
     JsonDocument doc; // Adjust size as needed
 
-    // print payload as hex to webserial if debugging is needed
-    // webSerial.print("Payload: ");
-    // for (const auto &byte : payload)
-
-    // {
-    //     webSerial.print(byte, HEX);
-    //     webSerial.print(" ");
-    // }
-
     if (!decodeFromMsgPack(payload.data(), payload.size(), doc))
     {
         LOG_WEBSERIALLN("MsgPack decoding failed");
@@ -152,15 +136,6 @@ void SerialIO::begin()
     ESP32_SERIAL.begin(ESP32_BAUDRATE);
     ESP32_SERIAL.onReceive([this]()
                            { this->onUartRx(); }); // Register the ISR callback as lambda
-}
-
-void SerialIO::pollSerialToQueue()
-{
-    while (ESP32_SERIAL.available())
-    {
-        uint8_t byte = ESP32_SERIAL.read();
-        xQueueSend(_rxQueue, &byte, 0); // Non-blocking
-    }
 }
 
 size_t SerialIO::write(const uint8_t *buffer, size_t size)

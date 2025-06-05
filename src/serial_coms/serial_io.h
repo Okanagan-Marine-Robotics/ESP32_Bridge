@@ -18,7 +18,6 @@ public:
     // write arduino json document to serial
     void publish(int channel, const JsonDocument &doc);
     void subscribe(int channel, JsonDocument &doc, SubscriptionCallback callback);
-    void pollSerialToQueue();
 
     using Callback = std::function<void(const JsonDocument &doc)>;
     void subscribe(uint8_t channel, Callback cb);
