@@ -5,6 +5,7 @@
 #include <ArduinoJson.h>
 #include <unordered_map>
 #include <vector>
+#include "ring_buffer.h"
 
 #define LED_PIN 2 // Built-in LED on many ESP32 boards
 
@@ -21,8 +22,8 @@ public:
 
     using Callback = std::function<void(const JsonDocument &doc)>;
     void subscribe(uint8_t channel, Callback cb);
-    void updateSubscriber(); // call frequently to process incoming data
     bool available();
+    void updateSubscribers();
 
 private:
     size_t write(const uint8_t *buffer, size_t size);
@@ -33,6 +34,6 @@ private:
     std::vector<uint8_t> _buffer;
     void _processPacket(const std::vector<uint8_t> &packet);
 
-    QueueHandle_t _rxQueue;
     void onUartRx();
+    RingBuffer _rxRing;
 };

@@ -54,45 +54,6 @@ void SerialIO::publish(int channel, const JsonDocument &doc)
     return;
 }
 
-void SerialIO::updateSubscriber()
-{
-    bool activity = false;
-    uint8_t byte;
-    while (xQueueReceive(_rxQueue, &byte, 0) == pdTRUE)
-    {
-        activity = true;
-        if (byte == 0x00)
-        {
-            if (!_buffer.empty())
-            {
-                auto decoded = cobs_transcoder::decode(_buffer);
-                _processPacket(decoded);
-                _buffer.clear();
-            }
-        }
-        else
-        {
-            _buffer.push_back(byte);
-
-            if (_buffer.size() > MAX_SERIAL_BUFFER_SIZE)
-            {
-                LOG_WEBSERIALLN("Buffer overflow, clearing buffer");
-                _buffer.clear();
-            }
-        }
-
-        // Check if incoming serial data is flooding beyond threshold
-        if (ESP32_SERIAL.available() > MAX_SERIAL_BUFFER_SIZE)
-        {
-            LOG_WEBSERIALLN("Serial buffer overflow, clearing buffers");
-            ESP32_SERIAL.flush(); // Flush unread data
-            _buffer.clear();      // Reset internal buffer
-            break;                // Prevent further processing
-        }
-    }
-    digitalWrite(LED_PIN, activity ? HIGH : LOW);
-}
-
 void SerialIO::_processPacket(const std::vector<uint8_t> &packet)
 {
     if (packet.size() < 3)
@@ -125,13 +86,14 @@ void SerialIO::_processPacket(const std::vector<uint8_t> &packet)
     if (it != _callbacks.end())
     {
         it->second(doc);
+        return;
     }
+    return;
 }
 
 void SerialIO::begin()
 {
     pinMode(LED_PIN, OUTPUT);
-    _rxQueue = xQueueCreate(512, sizeof(uint8_t)); // Create a queue to hold received bytes
 
     ESP32_SERIAL.begin(ESP32_BAUDRATE);
     ESP32_SERIAL.onReceive([this]()
@@ -165,12 +127,42 @@ void SerialIO::flush()
     return;
 }
 
+void SerialIO::updateSubscribers()
+{
+    uint8_t byte;
+    while (_rxRing.pop(byte))
+    {
+        if (byte == 0x00)
+        {
+            if (!_buffer.empty())
+            {
+                digitalWrite(LED_PIN, HIGH); // Turn on the LED to indicate activity
+                auto decoded = cobs_transcoder::decode(_buffer);
+                _processPacket(decoded);
+                _buffer.clear();
+                digitalWrite(LED_PIN, LOW); // Turn off the LED after processing
+            }
+        }
+        else
+        {
+            _buffer.push_back(byte);
+            if (_buffer.size() > MAX_SERIAL_BUFFER_SIZE)
+            {
+                LOG_WEBSERIALLN("Buffer overflow, clearing buffer");
+                _buffer.clear();
+            }
+        }
+    }
+}
+
 void SerialIO::onUartRx()
 {
-    LOG_WEBSERIALLN("UART RX Interrupt triggered");
     while (ESP32_SERIAL.available())
     {
         uint8_t byte = ESP32_SERIAL.read();
-        xQueueSend(_rxQueue, &byte, 0); // Non-blocking
+        if (!_rxRing.push(byte))
+        {
+            LOG_WEBSERIALLN("Ring buffer overflow");
+        }
     }
 }

@@ -39,22 +39,18 @@ int webSerialVprintf(const char *fmt, va_list args)
 
 void serialTask(void *parameter)
 {
-    serialio.begin(); // Initialize serial communication
-    LOG_WEBSERIALLN("Serial task started");
-
+    // This task is intentionally left empty to allow the main loop to run
+    // It is used to keep the task alive and prevent deletion
     for (;;)
     {
-        serialio.updateSubscriber();  // Process incoming messages
-        vTaskDelay(pdMS_TO_TICKS(1)); // Yield CPU to other tasks
+        serialio.updateSubscribers(); // Process incoming serial data
+        vTaskDelay(pdMS_TO_TICKS(1)); // Delay to prevent busy-waiting
     }
 }
 
 void setup()
 {
-    // while (!ESP32_SERIAL)
-    // {
-    //     vTaskDelay(100 / portTICK_PERIOD_MS); // Wait for serial port to connect. Needed for native USB
-    // }
+    serialio.begin(); // Initialize serial communication
 
 #if WIFI_ENABLED
     WiFi.softAP(ssid, password);
@@ -96,14 +92,8 @@ void setup()
                                     // LOG_WEBSERIALLN("Received on channel 254: " + doc.as<String>());
                                     xQueueSend(*signalingTaskQueueHandle, &copy, 0); });
 
-    xTaskCreatePinnedToCore(
-        serialTask,             // Task function
-        "Serial Task",          // Task name
-        SERIAL_TASK_STACK_SIZE, // Stack size
-        NULL,                   // Parameters
-        10,                     // Priority (higher than default = more responsive)
-        NULL,                   // Task handle
-        0);                     // Core 1 (or use 0 if core 1 is busy)
+    // Create a task to handle serial communication
+    BaseType_t taskResult = xTaskCreatePinnedToCore(serialTask, "SerialTask", SERIAL_TASK_STACK_SIZE, NULL, SERIAL_TASK_PRIORITY, NULL, 1);
 }
 
 void loop()
