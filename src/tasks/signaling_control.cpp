@@ -114,9 +114,10 @@ void signalingTask(void *parameter)
                 LOG_WEBSERIALLN("Unknown command: " + commandType);
                 break;
             }
-            delete doc; // Clean up the received document
-        }
 
+            delete doc;    // ✅ Only delete when we actually received something
+            doc = nullptr; // Reset for safety
+        }
         vTaskDelay(pdMS_TO_TICKS(1)); // Yield CPU to other tasks
     }
 }

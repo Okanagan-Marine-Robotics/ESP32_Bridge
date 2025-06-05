@@ -82,21 +82,20 @@ void setup()
                                     JsonDocument *copy = new JsonDocument;
                                     *copy = doc;
                                     // LOG_WEBSERIALLN("Received on channel 1: " + doc.as<String>());
-                                    xQueueSend(*motorTaskQueueHandle, &copy, 0); });
+                                    if (xQueueSend(*motorTaskQueueHandle, &copy, 0) != pdPASS) 
+                                    { 
+                                        delete copy;  // Clean up if send fails
+                                    } });
 
     serialio.subscribe(254, [signalingTaskQueueHandle](const JsonDocument &doc)
-                       {
-                           // JsonDocument *copy = new JsonDocument;
-                           // *copy = doc;
-                           // // LOG_WEBSERIALLN("Received on channel 254: " + doc.as<String>());
-                           // xQueueSend(*signalingTaskQueueHandle, &copy, 0);
-                       });
-    serialio.subscribe(253, [signalingTaskQueueHandle](const JsonDocument &doc)
                        {
                            JsonDocument *copy = new JsonDocument;
                            *copy = doc;
                            // LOG_WEBSERIALLN("Received on channel 254: " + doc.as<String>());
-                           xQueueSend(*signalingTaskQueueHandle, &copy, 0); });
+                           if (xQueueSend(*signalingTaskQueueHandle, &copy, 0) != pdPASS) 
+                           { 
+                            delete copy;  // Clean up if send fails
+                            } });
 
     // Create a task to handle serial communication
     BaseType_t taskResult = xTaskCreatePinnedToCore(serialTask, "SerialTask", SERIAL_TASK_STACK_SIZE, NULL, SERIAL_TASK_PRIORITY, NULL, 1);
