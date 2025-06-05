@@ -15,23 +15,17 @@ void SerialIO::subscribe(uint8_t channel, Callback cb)
 void SerialIO::publish(int channel, const JsonDocument &doc)
 {
 
-    if (doc.isNull() || doc.size() == 0)
-    {
-        LOG_WEBSERIALLN("Warning: Tried to publish empty JsonDocument");
-        return;
-    }
+    // why do we sometimes get empty documents?
+    // if (doc.isNull() || doc.size() == 0)
+    // {
+    //     LOG_WEBSERIALLN("Warning: Tried to publish empty JsonDocument");
+    //     return;
+    // }
 
     digitalWrite(LED_PIN, HIGH); // Turn on the LED to indicate activity
     auto msgpackdata = encodeToMsgPack(doc);
     // add channel information to the beginning of the message
     std::vector<uint8_t> message;
-
-    LOG_WEBSERIALLN("Raw Message:");
-    for (auto b : message)
-    {
-        webSerial.printf("%02X ", b);
-    }
-    webSerial.println();
 
     message.push_back(static_cast<uint8_t>(channel));
     message.insert(message.end(), msgpackdata.begin(), msgpackdata.end());
@@ -75,6 +69,7 @@ void SerialIO::_processPacket(const std::vector<uint8_t> &packet)
     std::vector<uint8_t> payload(message.begin() + 1, message.end());
 
     JsonDocument doc; // Adjust size as needed
+    doc.clear();      // Clear the document to avoid residual data
 
     if (!decodeFromMsgPack(payload.data(), payload.size(), doc))
     {

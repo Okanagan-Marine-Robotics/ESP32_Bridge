@@ -38,6 +38,15 @@ void getHighWater(JsonDocument &doc)
     vPortFree(taskStatusArray);
 }
 
+void getHeapInfo(JsonDocument &doc)
+{
+    size_t freeHeap = esp_get_free_heap_size();
+    size_t largestBlock = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+
+    doc["free_heap"] = freeHeap;
+    doc["largest_free_block"] = largestBlock;
+}
+
 void signalingTask(void *parameter)
 {
     JsonDocument *doc;
@@ -54,6 +63,7 @@ void signalingTask(void *parameter)
             case hash_str("ping"):
             {
                 JsonDocument response;
+                response.clear();
 
                 // LOG_WEBSERIALLN("Received ping command");
                 // Respond with a pong message
@@ -78,10 +88,22 @@ void signalingTask(void *parameter)
             case hash_str("get_water_level"):
             {
                 JsonDocument response;
+                response.clear();
 
                 LOG_WEBSERIALLN("Received get_water_level command");
                 // Respond with the current water level
                 getHighWater(response); // Assume this function exists
+                response["status"] = 200;
+                response["timestamp"] = millis();
+                serialio.publish(254, response);
+                break;
+            }
+
+            case hash_str("get_heap_info"):
+            {
+                JsonDocument response;
+                response.clear();
+                getHeapInfo(response);
                 response["status"] = 200;
                 response["timestamp"] = millis();
                 serialio.publish(254, response);

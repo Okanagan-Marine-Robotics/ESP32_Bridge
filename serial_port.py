@@ -14,7 +14,42 @@ def received(data):
     if "tasks" in data:
         print("Tasks received, updating water level...")
         get_water_level(data)  # call the function to handle water level display
+        
+    if "free_heap" in data:
+        print("Heap info received, updating heap info...")
+        get_heap_info(data)
 
+def get_heap_info(data):
+    # open a new window
+    heap_window = tk.Toplevel()
+    heap_window.title("Heap Info")
+    heap_window.geometry("600x400")
+    label = tk.Label(heap_window, text="Heap Information")
+    label.pack(pady=10)
+    
+    # create a text widget to display the heap info
+    text = tk.Text(heap_window, wrap=tk.WORD, font=("Arial", 12))
+    text.pack(expand=True, fill=tk.BOTH, padx=10, pady=10)
+    
+    # insert the heap info into the text widget
+    if "free_heap" in data:
+        # {'free_heap': 193764, 'largest_free_block': 110592, 'status': 200, 'timestamp': 57720}
+        free_heap = data.get("free_heap", "N/A")
+        largest_free_block = data.get("largest_free_block", "N/A")
+        
+        # Format the heap information
+        heap_info = (
+            f"Free Heap: {free_heap} bytes\n"
+            f"Largest Free Block: {largest_free_block} bytes\n"
+        )
+        
+        text.insert(tk.END, heap_info)
+        
+    else:
+        text.insert(tk.END, "No heap information available.")
+    
+    close_button = tk.Button(heap_window, text="Close", command=heap_window.destroy)
+    close_button.pack(pady=10)
     
 # create a new function to handle get_water_level command
 # this should open a new window and display the task names and their memory usage
@@ -132,6 +167,9 @@ def main():
 
     button_mem = tk.Button(frame, text="Get Task Memory Usage", command=lambda: seaport.publish(254, {"cmd": "get_water_level"}))
     button_mem.pack(side=tk.LEFT, padx=5)
+
+    button_heap = tk.Button(frame, text="Get Heap Info", command=lambda: seaport.publish(254, {"cmd": "get_heap_info"}))
+    button_heap.pack(side=tk.LEFT, padx=5)
 
     # add a slider that sends signals to the serial port when moved
     sliders = []

@@ -37,9 +37,9 @@ def main():
         seaport.publish(254, {'cmd': 'ping'})
         
         # # print out hello every 100 loops
-        # iter = iter + 1
-        # if (iter % 100 == 0):
-        #     seaport.publish(254, {'cmd': "get_water_level"})
+        iter = iter + 1
+        if (iter % 100 == 0):
+            seaport.publish(253, {'cmd': "get_heap_info"})
         
 
 
