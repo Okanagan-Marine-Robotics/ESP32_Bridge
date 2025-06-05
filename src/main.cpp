@@ -1,6 +1,6 @@
 #include <Arduino.h>
-// #include <WiFi.h>
-// #include <MycilaWebSerial.h>
+#include <WiFi.h>
+#include <MycilaWebSerial.h>
 
 // #include "esp_task_wdt.h"
 
@@ -51,10 +51,10 @@ void serialTask(void *parameter)
 
 void setup()
 {
-    while (!ESP32_SERIAL)
-    {
-        vTaskDelay(100 / portTICK_PERIOD_MS); // Wait for serial port to connect. Needed for native USB
-    }
+    // while (!ESP32_SERIAL)
+    // {
+    //     vTaskDelay(100 / portTICK_PERIOD_MS); // Wait for serial port to connect. Needed for native USB
+    // }
 
 #if WIFI_ENABLED
     WiFi.softAP(ssid, password);

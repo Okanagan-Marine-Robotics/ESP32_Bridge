@@ -127,6 +127,8 @@ def main():
     frame = tk.Frame(root)
     frame.pack(pady=10)
 
+    print(f"Sending to motor: {motor_index}, value: {value}")
+
     button_ping = tk.Button(frame, text="Send Ping", command=lambda: seaport.publish(254, {"cmd": "ping"}))
     button_ping.pack(side=tk.LEFT, padx=5)
 
