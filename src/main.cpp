@@ -109,5 +109,6 @@ void setup()
 void loop()
 {
     // remove this task
-    serialio.pollSerialToQueue(); // Poll serial data to queue
+    vTaskDelete(NULL); // Delete the current task to free resources
+    // serialio.pollSerialToQueue(); // Poll serial data to queue
 }

@@ -35,5 +35,5 @@ private:
     void _processPacket(const std::vector<uint8_t> &packet);
 
     QueueHandle_t _rxQueue;
-    static void IRAM_ATTR onUartRx(void *arg);
+    void onUartRx();
 };

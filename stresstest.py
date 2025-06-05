@@ -29,13 +29,12 @@ def main():
     iter = 0
     while True:
         # Lerp motors between -1 and 1 using a sine wave
-        for i in range(8):
-            motors[i] = math.sin(t + i)  # smoothly oscillates between -1 and 1
-        seaport.publish(1, {str(i): motors[i] for i in range(8)})
-        t += 0.01
+        # for i in range(8):
+        #     motors[i] = math.sin(t + i)  # smoothly oscillates between -1 and 1
+        # seaport.publish(1, {str(i): motors[i] for i in range(8)})
+        # t += 0.01
     
-        # seaport.publish(254, {'cmd': 'ping'})
-        # time.sleep(0.0005)
+        seaport.publish(254, {'cmd': 'ping'})
         
         # # print out hello every 100 loops
         # iter = iter + 1

@@ -5,6 +5,7 @@
 #include "cobs_transcoder.h"
 #include "MycilaWebSerial.h"
 #include "configuration.h"
+#include "driver/uart.h"
 
 void SerialIO::subscribe(uint8_t channel, Callback cb)
 {
@@ -14,23 +15,23 @@ void SerialIO::subscribe(uint8_t channel, Callback cb)
 void SerialIO::publish(int channel, const JsonDocument &doc)
 {
 
-    if (doc.isNull() || doc.size() == 0) {
+    if (doc.isNull() || doc.size() == 0)
+    {
         LOG_WEBSERIALLN("Warning: Tried to publish empty JsonDocument");
         return;
     }
-
 
     digitalWrite(LED_PIN, HIGH); // Turn on the LED to indicate activity
     auto msgpackdata = encodeToMsgPack(doc);
     // add channel information to the beginning of the message
     std::vector<uint8_t> message;
 
-        LOG_WEBSERIALLN("Raw Message:");
-    for (auto b : message) {
+    LOG_WEBSERIALLN("Raw Message:");
+    for (auto b : message)
+    {
         webSerial.printf("%02X ", b);
     }
     webSerial.println();
-
 
     message.push_back(static_cast<uint8_t>(channel));
     message.insert(message.end(), msgpackdata.begin(), msgpackdata.end());
@@ -124,7 +125,7 @@ void SerialIO::_processPacket(const std::vector<uint8_t> &packet)
     // print payload as hex to webserial if debugging is needed
     // webSerial.print("Payload: ");
     // for (const auto &byte : payload)
-    
+
     // {
     //     webSerial.print(byte, HEX);
     //     webSerial.print(" ");
@@ -146,8 +147,11 @@ void SerialIO::_processPacket(const std::vector<uint8_t> &packet)
 void SerialIO::begin()
 {
     pinMode(LED_PIN, OUTPUT);
+    _rxQueue = xQueueCreate(512, sizeof(uint8_t)); // Create a queue to hold received bytes
+
     ESP32_SERIAL.begin(ESP32_BAUDRATE);
-    _rxQueue = xQueueCreate(512, sizeof(uint8_t));
+    ESP32_SERIAL.onReceive([this]()
+                           { this->onUartRx(); }); // Register the ISR callback as lambda
 }
 
 void SerialIO::pollSerialToQueue()
@@ -162,10 +166,11 @@ void SerialIO::pollSerialToQueue()
 size_t SerialIO::write(const uint8_t *buffer, size_t size)
 {
     auto ret = ESP32_SERIAL.write(buffer, size);
-    if (ret != size) {
+    if (ret != size)
+    {
         LOG_WEBSERIALLN("Warning: Not all bytes written!");
     }
-    ESP32_SERIAL.flush(); 
+    ESP32_SERIAL.flush();
     return ret;
 }
 
@@ -185,15 +190,12 @@ void SerialIO::flush()
     return;
 }
 
-void IRAM_ATTR SerialIO::onUartRx(void *arg)
+void SerialIO::onUartRx()
 {
-    SerialIO *self = static_cast<SerialIO *>(arg);
+    LOG_WEBSERIALLN("UART RX Interrupt triggered");
     while (ESP32_SERIAL.available())
     {
         uint8_t byte = ESP32_SERIAL.read();
-        BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-        xQueueSendFromISR(self->_rxQueue, &byte, &xHigherPriorityTaskWoken);
-        if (xHigherPriorityTaskWoken)
-            portYIELD_FROM_ISR();
+        xQueueSend(_rxQueue, &byte, 0); // Non-blocking
     }
 }
