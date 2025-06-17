@@ -1,12 +1,13 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <MycilaWebSerial.h>
-
-// #include "esp_task_wdt.h"
+#include <Wire.h>
 
 #include "serial_coms/serial_io.h"
 #include "tasks/motor_control.h"
 #include "tasks/signaling_control.h"
+
+#include "device_bus/device_bus.h"
 
 #include "configuration.h"
 
@@ -25,6 +26,7 @@ const char *password = WIFI_PASSWORD;
 #endif
 
 SerialIO serialio;
+DeviceBusClient deviceBus; // Create a global instance of DeviceBus
 
 // Define a function with the correct signature for esp_log_set_vprintf
 #if USE_WEBSERIAL
@@ -72,6 +74,57 @@ void setup()
 #if WIFI_ENABLED
     server.begin();
 #endif
+
+    // set 0x01 to i2c address 0x42
+    // Wire.begin(SDA, SCL);  // Initialize I2C with default SDA and SCL pins
+    // Wire.setClock(100000); // Set I2C clock speed to 100kHz
+
+    // // send 0x01 to device at address 0x42
+    // Wire.beginTransmission(0x42);    // Start transmission to device at address 0x42
+    // Wire.write(0x42);                // Write 0x01 to the device
+    // if (Wire.endTransmission() != 0) // End transmission and check for errors
+    // {
+    //     Serial.println("Failed to send data to device at address 0x42");
+    // }
+    // else
+    // {
+    //     Serial.println("Data sent successfully to device at address 0x42");
+    // }
+
+    // create config for device bus
+    // DeviceBusConfig config;
+    // config.frequency = 100000;   // Set I2C frequency to 100kHz
+    // config.slave_address = 0x42; // Set the slave address for the device bus
+    // config.debug_enabled = true; // Enable debug output for device bus
+    // if (!deviceBus.begin(config))
+    // {
+    //     Serial.println("Failed to initialize device bus!");
+    //     return;
+    // }
+
+    // // Get device count
+    // uint8_t device_count = deviceBus.getDeviceCount();
+    // Serial.printf("Found %d devices\n\n", device_count);
+
+    // // Get device list
+    // DeviceInfo devices[10];
+    // uint8_t actual_count;
+
+    // if (deviceBus.getDeviceList(devices, 10, actual_count))
+    // {
+    //     Serial.println("Device List:");
+    //     Serial.println("============");
+    //     for (uint8_t i = 0; i < actual_count; i++)
+    //     {
+    //         deviceBus.printDeviceInfo(devices[i]);
+    //     }
+    // }
+
+    // while (true)
+    // {
+    //     vTaskDelay(pdMS_TO_TICKS(1000));
+    //     // just stop the code for testing
+    // }
 
     QueueHandle_t *motorTaskQueueHandle = setupMotorControl();         // Initialize motor control
     QueueHandle_t *signalingTaskQueueHandle = setupSignalingControl(); // Initialize signaling control
