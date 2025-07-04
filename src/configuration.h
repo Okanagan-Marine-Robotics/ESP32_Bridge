@@ -26,11 +26,12 @@ extern WebSerial webSerial; // Forward declaration for WebSerial
 #define ESC_MIN 1100                              // Maximum reverse throttle (μs)
 #define USE_DUTY_US false                         // Use duty cycle in microseconds for ESC control
 #define SAFETY_TIMEOUT 5.0                        // Safety timeout in seconds for ESCs to reset to neutral if no commands are received
+#define INVERTING_OPTOCOUPLER true                // we can invert the signal if we have an optocoupler that inverts the output
 
 /**********************
  * WIFI CONFIGURATION *
  **********************/
-#define WIFI_ENABLED true // Enable/disable WiFi
+#define WIFI_ENABLED false // Enable/disable WiFi
 
 #if WIFI_ENABLED
 #define WIFI_SSID "ESP Bridge"   // WiFi SSID
@@ -40,7 +41,7 @@ extern WebSerial webSerial; // Forward declaration for WebSerial
 /***************************
  * WEBSERIAL CONFIGURATION *
  ***************************/
-#define USE_WEBSERIAL true     // Enable/disable WebSerial debug
+#define USE_WEBSERIAL false    // Enable/disable WebSerial debug
 #define LOG_LEVEL ESP_LOG_INFO // Default log level for WebSerial
 
 #if !WIFI_ENABLED && USE_WEBSERIAL

@@ -33,6 +33,10 @@ void ESCDriver::setThrottle(float percent, bool bidirectional, float min_us, flo
     }
     uint32_t max_duty = (1 << resolution_bits_) - 1;
     uint32_t duty = static_cast<uint32_t>((us * max_duty * freq_hz_) / 1000000.0f);
+    if (INVERTING_OPTOCOUPLER)
+    {
+        duty = invertDuty(duty);
+    }
     ledcWrite(channel_, duty);
 }
 
@@ -48,5 +52,16 @@ void ESCDriver::setDutyUs(uint32_t set_us)
     // Convert microseconds to duty cycle
     uint32_t max_duty = (1 << resolution_bits_) - 1;
     uint32_t duty = static_cast<uint32_t>((set_us * max_duty * freq_hz_) / 1000000.0f);
+    // Invert the duty cycle if necessary
+    if (INVERTING_OPTOCOUPLER)
+    {
+        duty = invertDuty(duty);
+    }
     ledcWrite(channel_, duty);
+}
+
+uint32_t ESCDriver::invertDuty(uint32_t duty)
+{
+    // Invert the duty cycle if necessary
+    return (1 << resolution_bits_) - 1 - duty;
 }

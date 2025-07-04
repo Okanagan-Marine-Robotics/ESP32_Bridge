@@ -19,4 +19,5 @@ private:
     int timer_;
     int freq_hz_;
     int resolution_bits_;
+    uint32_t invertDuty(uint32_t);
 };
