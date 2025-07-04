@@ -24,6 +24,8 @@ extern WebSerial webSerial; // Forward declaration for WebSerial
 #define ESC_MAX 1900                              // Maximum forward throttle (μs)
 #define ESC_MID 1500                              // Neutral throttle (μs)
 #define ESC_MIN 1100                              // Maximum reverse throttle (μs)
+#define USE_DUTY_US false                         // Use duty cycle in microseconds for ESC control
+#define SAFETY_TIMEOUT 5.0                        // Safety timeout in seconds for ESCs to reset to neutral if no commands are received
 
 /**********************
  * WIFI CONFIGURATION *
@@ -54,6 +56,14 @@ extern WebSerial webSerial; // Forward declaration for WebSerial
 #define LOG_WEBSERIAL(msg) ((void)0)
 #endif
 
+/*********************
+ * LED CONFIGURATION *
+ *********************/
+#define NUM_LEDS 6         // Number of LEDs 6 on ESP32 Mobo
+#define LED_PIN 2          // GPIO pin for LED control
+#define LED_BRIGHTNESS 255 // Default (0-255) Brightness level
+#define LED_SPEED 500      // Default speed of LED patterns in milliseconds
+
 /**********************
  * RTOS CONFIGURATION *
  **********************/
@@ -69,3 +79,13 @@ extern WebSerial webSerial; // Forward declaration for WebSerial
 
 #define SERIAL_TASK_STACK_SIZE 4096 * 2 // Stack size for serial task
 #define SERIAL_TASK_PRIORITY 1          // Priority for serial task
+
+/**********************
+ * DEVICE BUS CONFIGURATION *
+ **********************/
+#define I2C_SPEED 100000 // I2C speed in Hz
+
+/*************************
+ * GENERAL CONFIGURATION *
+ *************************/
+#define STARTUP_DELAY 1 // Startup delay in seconds to allow devices to connect to the WiFi network for logging

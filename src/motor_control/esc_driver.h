@@ -11,6 +11,7 @@ public:
 
     // Set ESC throttle: value in range [-1.0, 1.0] for bidirectional, or [0.0, 1.0] for unidirectional
     void setThrottle(float percent, bool bidirectional = ESC_BIDIRECTIONAL, float min_us = ESC_MIN, float max_us = ESC_MAX, float center_us = ESC_MID);
+    void setDutyUs(uint32_t set_us);
 
 private:
     int pwm_gpio_;

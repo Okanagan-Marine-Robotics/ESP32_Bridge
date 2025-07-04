@@ -2,6 +2,7 @@
 #include "ArduinoJson.h"
 
 QueueHandle_t motorQueue;
+double lastRequestTime = 0.0;
 
 void motorControlTask(void *parameter)
 {
@@ -15,23 +16,43 @@ void motorControlTask(void *parameter)
     }
 
     JsonDocument *doc;
+
     for (;;)
     {
-        if (xQueueReceive(motorQueue, &doc, portMAX_DELAY) == pdPASS)
+        if (xQueueReceive(motorQueue, &doc, pdMS_TO_TICKS(100)) == pdPASS)
         {
+            lastRequestTime = millis() / 1000.0;
             for (JsonPair kv : (*doc).as<JsonObject>())
             {
                 int idx = atoi(kv.key().c_str());
                 if (idx >= 0 && idx < NUM_ESC)
                 {
+#if USE_DUTY_US
+                    uint32_t dutyUs = kv.value().as<uint32_t>() | ESC_MID; // Default to the 0 value
+                    escDrivers[idx]->setDutyUs(dutyUs);
+#else
                     float throttle = kv.value().as<float>();
-                    escDrivers[idx]->setThrottle(throttle);
-                    // LOG_WEBSERIALLN("ESC " + String(idx) + " set to " + String(throttle));
+
+                    escDrivers[idx]
+                        ->setThrottle(throttle);
+#endif
                 }
             }
             delete doc;
         }
-        vTaskDelay(pdMS_TO_TICKS(1)); // Yield CPU to other tasks
+        else
+        {
+            double now = millis() / 1000.0;
+            if (now - lastRequestTime > SAFETY_TIMEOUT)
+            {
+                for (size_t i = 0; i < NUM_ESC; ++i)
+                {
+                    escDrivers[i]->setThrottle(0.0f);
+                }
+                lastRequestTime = now; // Prevent repeated resets
+            }
+        }
+        taskYIELD(); // Yield only if there are higher priority tasks ready to run
     }
 }
 

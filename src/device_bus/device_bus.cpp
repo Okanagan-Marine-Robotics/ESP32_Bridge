@@ -1,638 +1,131 @@
 #include "device_bus.h"
-#include <stdarg.h>
 
-// Global convenience instance
-DeviceBusClient DeviceBus;
-
-// DeviceInfo helper methods implementation
-const char *DeviceInfo::getTypeName() const
+void DeviceBus::setup()
 {
-    return deviceTypeToString(device_type);
-}
+    Wire.setPins(21, 22); // Set SDA and SCL pins (GPIO 21 and 22 are default for ESP32)
+    Wire.begin();
+    Wire.setClock(100000); // Set I2C clock speed to 100kHz
 
-const char *DeviceInfo::getDataTypeName() const
-{
-    return dataTypeToString(data_type);
-}
-
-// DeviceBusClient implementation
-DeviceBusClient::DeviceBusClient(const DeviceBusConfig &config)
-    : config_(config), initialized_(false), last_error_(DeviceBusStatus::OK), stats_{}, device_cache_(nullptr), cached_device_count_(0), cache_valid_(false), device_discovered_callback_(nullptr), error_callback_(nullptr), data_received_callback_(nullptr)
-{
-}
-
-bool DeviceBusClient::begin()
-{
-    return begin(config_);
-}
-
-bool DeviceBusClient::begin(const DeviceBusConfig &config)
-{
-    config_ = config;
-
-    debugPrint("Initializing Device Bus Client...");
-
-    // Initialize I2C
-    config_.wire_instance->begin(config_.sda_pin, config_.scl_pin);
-    config_.wire_instance->setClock(config_.frequency);
-
-    // Test connection
-    if (!ping())
+    // Scan for devices on the bus
+    for (uint8_t address = 1; address < 127; ++address)
     {
-        setError(DeviceBusStatus::I2C_ERROR, "Failed to connect to slave device");
-        return false;
-    }
-
-    // Initialize device cache
-    if (!refreshDeviceCache())
-    {
-        debugPrint("Warning: Failed to build initial device cache");
-    }
-
-    initialized_ = true;
-    debugPrint("Device Bus Client initialized successfully");
-
-    return true;
-}
-
-void DeviceBusClient::end()
-{
-    if (device_cache_)
-    {
-        delete[] device_cache_;
-        device_cache_ = nullptr;
-    }
-
-    cached_device_count_ = 0;
-    cache_valid_ = false;
-    initialized_ = false;
-
-    debugPrint("Device Bus Client ended");
-}
-
-void DeviceBusClient::setConfig(const DeviceBusConfig &config)
-{
-    config_ = config;
-    if (initialized_)
-    {
-        debugPrint("Configuration changed - re-initialization recommended");
-    }
-}
-
-bool DeviceBusClient::isConnected()
-{
-    return ping();
-}
-
-bool DeviceBusClient::ping()
-{
-    uint8_t rx_len;
-    bool result = executeCommand(DeviceBusCommands::NOP, nullptr, 0, rx_buffer_, rx_len);
-    return result;
-}
-
-const char *DeviceBusClient::getLastErrorMessage() const
-{
-    return statusCodeToString(last_error_);
-}
-
-uint8_t DeviceBusClient::getDeviceCount()
-{
-    uint8_t rx_len;
-
-    if (!executeCommand(DeviceBusCommands::GET_DEVICE_COUNT, nullptr, 0, rx_buffer_, rx_len))
-    {
-        return 0;
-    }
-
-    if (rx_len >= 1)
-    {
-        return rx_buffer_[0];
-    }
-
-    return 0;
-}
-
-bool DeviceBusClient::getDeviceInfo(uint8_t device_id, DeviceInfo &info)
-{
-    uint8_t rx_len;
-
-    if (!executeCommand(DeviceBusCommands::GET_DEVICE_INFO, &device_id, 1, rx_buffer_, rx_len))
-    {
-        return false;
-    }
-
-    if (rx_len >= sizeof(DeviceInfo))
-    {
-        memcpy(&info, rx_buffer_, sizeof(DeviceInfo));
-
-        if (device_discovered_callback_)
+        if (address == ENVIRONMENTAL_SENSOR_ADDRESS ||
+            address == GYRO_ADDRESS ||
+            address == ACCELEROMETER_ADDRESS)
         {
-            device_discovered_callback_(info);
+            continue; // Skip known non-sensor board addresses
         }
-
-        return true;
-    }
-
-    setError(DeviceBusStatus::ERROR, "Invalid device info response");
-    return false;
-}
-
-bool DeviceBusClient::getDeviceList(DeviceInfo *devices, uint8_t max_devices, uint8_t &actual_count)
-{
-    uint8_t rx_len;
-
-    if (!executeCommand(DeviceBusCommands::GET_DEVICE_LIST, nullptr, 0, rx_buffer_, rx_len))
-    {
-        return false;
-    }
-
-    if (rx_len < 1)
-    {
-        setError(DeviceBusStatus::ERROR, "Invalid device list response");
-        return false;
-    }
-
-    actual_count = rx_buffer_[0];
-    uint8_t devices_to_copy = min(actual_count, max_devices);
-
-    uint8_t offset = 1;
-    for (uint8_t i = 0; i < devices_to_copy && (offset + sizeof(DeviceInfo)) <= rx_len; i++)
-    {
-        memcpy(&devices[i], &rx_buffer_[offset], sizeof(DeviceInfo));
-        offset += sizeof(DeviceInfo);
-
-        if (device_discovered_callback_)
+        Wire.beginTransmission(address);
+        if (Wire.endTransmission() == 0)
         {
-            device_discovered_callback_(devices[i]);
+            LOG_WEBSERIALLN("Found device at address: 0x" + String(address, HEX));
+            // Serial.println("Found device at address: 0x" + String(address, HEX));
+            potentialAddresses.push_back(address);
         }
     }
-
-    return true;
 }
 
-bool DeviceBusClient::findDeviceByName(const char *name, DeviceInfo &info)
+void DeviceBus::discover()
 {
-    if (!cache_valid_ && !refreshDeviceCache())
-    {
-        return false;
-    }
+    // Clear previous discoveries
+    sensorBoards.clear();
 
-    for (uint8_t i = 0; i < cached_device_count_; i++)
+    // Check for known devices
+    for (uint8_t address : potentialAddresses)
     {
-        if (strcmp(device_cache_[i].name, name) == 0)
+        // send a no-operation command to the device
+        Wire.beginTransmission(address);
+        // write a 0x00 byte to the device
+        Wire.write(0x00);
+        if (Wire.endTransmission() != 0)
         {
-            info = device_cache_[i];
-            return true;
+            LOG_WEBSERIALLN("Device at address 0x" + String(address, HEX) + " did not respond.");
+            continue; // Device did not respond, skip it
         }
-    }
-
-    setError(DeviceBusStatus::DEVICE_NOT_FOUND, "Device not found by name");
-    return false;
-}
-
-bool DeviceBusClient::findDevicesByType(uint8_t device_type, DeviceInfo *devices, uint8_t max_devices, uint8_t &found_count)
-{
-    if (!cache_valid_ && !refreshDeviceCache())
-    {
-        return false;
-    }
-
-    found_count = 0;
-
-    for (uint8_t i = 0; i < cached_device_count_ && found_count < max_devices; i++)
-    {
-        if (device_cache_[i].device_type == device_type)
+        // now read if the device responds with it's address
+        Wire.requestFrom(address, 1);
+        if (Wire.available() > 0)
         {
-            devices[found_count] = device_cache_[i];
-            found_count++;
-        }
-    }
-
-    return true;
-}
-
-bool DeviceBusClient::readDevice(uint8_t device_id, void *data, uint8_t &data_len)
-{
-    uint8_t rx_len;
-
-    if (!executeCommand(DeviceBusCommands::READ_DEVICE, &device_id, 1, rx_buffer_, rx_len))
-    {
-        return false;
-    }
-
-    if (rx_len > 0 && data)
-    {
-        uint8_t copy_len = min(data_len, rx_len);
-        memcpy(data, rx_buffer_, copy_len);
-        data_len = copy_len;
-
-        if (data_received_callback_)
-        {
-            data_received_callback_(device_id, data, copy_len);
-        }
-
-        return true;
-    }
-
-    data_len = 0;
-    return false;
-}
-
-bool DeviceBusClient::writeDevice(uint8_t device_id, const void *data, uint8_t data_len)
-{
-    if (data_len >= (I2C_DEVICE_BUS_BUFFER_SIZE - 1))
-    {
-        setError(DeviceBusStatus::ERROR, "Data too large");
-        return false;
-    }
-
-    tx_buffer_[0] = device_id;
-    if (data && data_len > 0)
-    {
-        memcpy(&tx_buffer_[1], data, data_len);
-    }
-
-    uint8_t rx_len;
-    return executeCommand(DeviceBusCommands::WRITE_DEVICE, tx_buffer_, data_len + 1, rx_buffer_, rx_len);
-}
-
-bool DeviceBusClient::readDeviceByName(const char *name, void *data, uint8_t &data_len)
-{
-    uint8_t name_len = strlen(name);
-    if (name_len >= MAX_DEVICE_NAME_LEN)
-    {
-        setError(DeviceBusStatus::ERROR, "Name too long");
-        return false;
-    }
-
-    uint8_t rx_len;
-    if (!executeCommand(DeviceBusCommands::READ_DEVICE_BY_NAME, (const uint8_t *)name, name_len, rx_buffer_, rx_len))
-    {
-        return false;
-    }
-
-    if (rx_len > 0 && data)
-    {
-        uint8_t copy_len = min(data_len, rx_len);
-        memcpy(data, rx_buffer_, copy_len);
-        data_len = copy_len;
-
-        if (data_received_callback_)
-        {
-            // Find device ID for callback
-            DeviceInfo info;
-            if (findDeviceByName(name, info))
+            uint8_t response = Wire.read();
+            if (response == address)
             {
-                data_received_callback_(info.device_id, data, copy_len);
-            }
-        }
-
-        return true;
-    }
-
-    data_len = 0;
-    return false;
-}
-
-bool DeviceBusClient::writeDeviceByName(const char *name, const void *data, uint8_t data_len)
-{
-    uint8_t name_len = strlen(name);
-    if (name_len >= MAX_DEVICE_NAME_LEN || (name_len + data_len + 1) >= I2C_DEVICE_BUS_BUFFER_SIZE)
-    {
-        setError(DeviceBusStatus::ERROR, "Data too large");
-        return false;
-    }
-
-    tx_buffer_[0] = name_len;
-    memcpy(&tx_buffer_[1], name, name_len);
-    if (data && data_len > 0)
-    {
-        memcpy(&tx_buffer_[1 + name_len], data, data_len);
-    }
-
-    uint8_t rx_len;
-    return executeCommand(DeviceBusCommands::WRITE_DEVICE_BY_NAME, tx_buffer_, name_len + data_len + 1, rx_buffer_, rx_len);
-}
-
-bool DeviceBusClient::getSystemStatus(SystemStatus &status)
-{
-    uint8_t rx_len;
-
-    if (!executeCommand(DeviceBusCommands::GET_SYSTEM_STATUS, nullptr, 0, rx_buffer_, rx_len))
-    {
-        return false;
-    }
-
-    if (rx_len >= sizeof(SystemStatus))
-    {
-        memcpy(&status, rx_buffer_, sizeof(SystemStatus));
-        return true;
-    }
-
-    setError(DeviceBusStatus::ERROR, "Invalid system status response");
-    return false;
-}
-
-// Type-specific helper implementations
-bool DeviceBusClient::readBME280(uint8_t device_id, BME280Data &data)
-{
-    return readDeviceTyped(device_id, data);
-}
-
-bool DeviceBusClient::readBME280ByName(const char *name, BME280Data &data)
-{
-    return readDeviceTypedByName(name, data);
-}
-
-bool DeviceBusClient::readBME280(uint8_t device_id, float &temperature, float &humidity, float &pressure, bool &valid)
-{
-    BME280Data data;
-    if (readBME280(device_id, data))
-    {
-        temperature = data.temperature;
-        humidity = data.humidity;
-        pressure = data.pressure;
-        valid = data.valid;
-        return true;
-    }
-    return false;
-}
-
-bool DeviceBusClient::readBME280ByName(const char *name, float &temperature, float &humidity, float &pressure, bool &valid)
-{
-    BME280Data data;
-    if (readBME280ByName(name, data))
-    {
-        temperature = data.temperature;
-        humidity = data.humidity;
-        pressure = data.pressure;
-        valid = data.valid;
-        return true;
-    }
-    return false;
-}
-
-bool DeviceBusClient::readGPIO(uint8_t device_id, bool &state)
-{
-    GPIOData data;
-    if (readDeviceTyped(device_id, data))
-    {
-        state = (data.state != 0);
-        return true;
-    }
-    return false;
-}
-
-bool DeviceBusClient::readGPIOByName(const char *name, bool &state)
-{
-    GPIOData data;
-    if (readDeviceTypedByName(name, data))
-    {
-        state = (data.state != 0);
-        return true;
-    }
-    return false;
-}
-
-bool DeviceBusClient::writeGPIO(uint8_t device_id, bool state)
-{
-    GPIOData data = {0};
-    data.state = state ? 1 : 0;
-    return writeDeviceTyped(device_id, data);
-}
-
-bool DeviceBusClient::writeGPIOByName(const char *name, bool state)
-{
-    GPIOData data = {0};
-    data.state = state ? 1 : 0;
-    return writeDeviceTypedByName(name, data);
-}
-
-bool DeviceBusClient::readADC(uint8_t device_id, uint16_t &raw_value, float &voltage)
-{
-    ADCData data;
-    if (readDeviceTyped(device_id, data))
-    {
-        raw_value = data.raw_value;
-        voltage = data.voltage;
-        return true;
-    }
-    return false;
-}
-
-bool DeviceBusClient::readADCByName(const char *name, uint16_t &raw_value, float &voltage)
-{
-    ADCData data;
-    if (readDeviceTypedByName(name, data))
-    {
-        raw_value = data.raw_value;
-        voltage = data.voltage;
-        return true;
-    }
-    return false;
-}
-
-bool DeviceBusClient::writePWM(uint8_t device_id, uint16_t duty_cycle, uint16_t frequency)
-{
-    PWMData data;
-    data.duty_cycle = duty_cycle;
-    data.frequency = frequency;
-    return writeDeviceTyped(device_id, data);
-}
-
-bool DeviceBusClient::writePWMByName(const char *name, uint16_t duty_cycle, uint16_t frequency)
-{
-    PWMData data;
-    data.duty_cycle = duty_cycle;
-    data.frequency = frequency;
-    return writeDeviceTypedByName(name, data);
-}
-
-bool DeviceBusClient::writePWMDuty(uint8_t device_id, uint16_t duty_cycle)
-{
-    // Read current settings first, then update duty cycle
-    PWMData current_data;
-    if (readDeviceTyped(device_id, current_data))
-    {
-        current_data.duty_cycle = duty_cycle;
-        return writeDeviceTyped(device_id, current_data);
-    }
-
-    // If read fails, write with default frequency
-    return writePWM(device_id, duty_cycle, 1000);
-}
-
-bool DeviceBusClient::writePWMDutyByName(const char *name, uint16_t duty_cycle)
-{
-    // Read current settings first, then update duty cycle
-    PWMData current_data;
-    if (readDeviceTypedByName(name, current_data))
-    {
-        current_data.duty_cycle = duty_cycle;
-        return writeDeviceTypedByName(name, current_data);
-    }
-
-    // If read fails, write with default frequency
-    return writePWMByName(name, duty_cycle, 1000);
-}
-
-bool DeviceBusClient::readAllInputs(DataReceivedCallback callback)
-{
-    if (!cache_valid_ && !refreshDeviceCache())
-    {
-        return false;
-    }
-
-    bool success = true;
-    uint8_t buffer[64]; // Temporary buffer for reading
-
-    for (uint8_t i = 0; i < cached_device_count_; i++)
-    {
-        if (device_cache_[i].isInput())
-        {
-            uint8_t data_len = sizeof(buffer);
-            if (readDevice(device_cache_[i].device_id, buffer, data_len))
-            {
-                if (callback)
+                LOG_WEBSERIALLN("Device at address 0x" + String(address, HEX) + " is responding.");
+                // Get sensor device information
+                SensorDevice device = getSensorDevice(address);
+                if (device.address != 0)
                 {
-                    callback(device_cache_[i].device_id, buffer, data_len);
-                }
-                else if (data_received_callback_)
-                {
-                    data_received_callback_(device_cache_[i].device_id, buffer, data_len);
+                    sensorBoards.push_back(device);
+                    LOG_WEBSERIALLN("Added device at address 0x" + String(device.address, HEX) + " to sensor bus.");
+                    // Serial.println("Added device at address 0x" + String(device.address, HEX) + " to sensor bus.");
                 }
             }
             else
             {
-                success = false;
+                LOG_WEBSERIALLN("Device at address 0x" + String(address, HEX) + " responded with unexpected data: 0x" + String(response, HEX));
             }
         }
-    }
-
-    return success;
-}
-
-bool DeviceBusClient::refreshDeviceCache()
-{
-    debugPrint("Refreshing device cache...");
-
-    uint8_t device_count = getDeviceCount();
-    if (device_count == 0)
-    {
-        debugPrint("No devices found");
-        return false;
-    }
-
-    // Allocate cache
-    if (device_cache_)
-    {
-        delete[] device_cache_;
-    }
-
-    device_cache_ = new DeviceInfo[device_count];
-    if (!device_cache_)
-    {
-        setError(DeviceBusStatus::ERROR, "Failed to allocate device cache");
-        return false;
-    }
-
-    // Get device list
-    uint8_t actual_count;
-    if (getDeviceList(device_cache_, device_count, actual_count))
-    {
-        cached_device_count_ = actual_count;
-        cache_valid_ = true;
-        debugPrintf("Device cache refreshed: %d devices", actual_count);
-        return true;
-    }
-
-    delete[] device_cache_;
-    device_cache_ = nullptr;
-    cached_device_count_ = 0;
-    cache_valid_ = false;
-
-    setError(DeviceBusStatus::ERROR, "Failed to refresh device cache");
-    return false;
-}
-
-void DeviceBusClient::printDeviceInfo(const DeviceInfo &info, Print &output)
-{
-    Serial.printf("Device ID: %d\n", info.device_id);
-    Serial.printf("Name: %s\n", info.name);
-    Serial.printf("Type: %d\n", info.device_type);
-    Serial.printf("Direction: %d\n", info.io_direction);
-    Serial.printf("Data Type: %d\n", info.data_type);
-    Serial.printf("Data Size: %d bytes\n", info.data_size);
-    Serial.println();
-}
-
-void DeviceBusClient::debugPrint(const char *message)
-{
-    if (config_.debug_enabled)
-    {
-        Serial.println(message);
+        else
+        {
+            LOG_WEBSERIALLN("No data received from device at address: 0x" + String(address, HEX));
+        }
     }
 }
 
-void DeviceBusClient::debugPrintf(const char *format, ...)
+SensorDevice DeviceBus::getSensorDevice(uint8_t address)
 {
-    if (config_.debug_enabled)
+    SensorDevice device = {address, 0, 0, 0, 0, 0}; // Initialize with default values
+    Wire.beginTransmission(address);
+    Wire.write(0xD1); // Request device information
+    if (Wire.endTransmission() != 0)
     {
-        va_list args;
-        va_start(args, format);
-        Serial.printf(format, args);
-        va_end(args);
-        Serial.println();
+        LOG_WEBSERIALLN("Device at address 0x" + String(address, HEX) + " did not respond.");
+        return device; // Device did not respond, return empty device
     }
-}
+    Wire.requestFrom((int)address, sizeof(SensorDevice) - 1);
+    if (Wire.available() == sizeof(SensorDevice) - 1)
+    {
+        // Read the remaining bytes after the address
+        Wire.readBytes(((uint8_t *)&device) + 1, sizeof(SensorDevice) - 1);
+        LOG_WEBSERIALLN("Device at address 0x" + String(address, HEX) + " has " + String(device.digitalOutputs) + " digital outputs, " +
+                        String(device.digitalInputs) + " digital inputs, " +
+                        String(device.analogInputs) + " analog inputs, " +
+                        String(device.bme280Sensors) + " BME280 sensors, " +
+                        String(device.ledCount) + " LEDs.");
 
-void DeviceBusClient::setError(uint8_t error_code, const char *message)
+        // Serial.println("Device at address 0x" + String(address, HEX) + " has " + String(device.digitalOutputs) + " digital outputs, " +
+        //                String(device.digitalInputs) + " digital inputs, " +
+        //                String(device.analogInputs) + " analog inputs, " +
+        //                String(device.bme280Sensors) + " BME280 sensors, " +
+        //                String(device.ledCount) + " LEDs.");
+
+        // if we have 1 leds we set it to blue to indicate that the device is connected
+        if (device.ledCount > 0)
+        {
+            RGB color = {0, 0, 255}; // Blue color
+            setLED(address, color);  // Set the first LED to blue
+        }
+    }
+    else
+    {
+        LOG_WEBSERIALLN("Device at address 0x" + String(address, HEX) + " did not return expected data.");
+    }
+    return device; // Return the device information
+};
+
+void DeviceBus::setLED(uint8_t address, RGB color, uint8_t index)
 {
-    last_error_ = error_code;
-    if (error_callback_)
+    Wire.beginTransmission(address);
+    Wire.write(0x05);    // Command to set LED color
+    Wire.write(index);   // LED index
+    Wire.write(color.r); // Red component
+    Wire.write(color.g); // Green component
+    Wire.write(color.b); // Blue component
+    if (Wire.endTransmission() != 0)
     {
-        error_callback_(error_code, message);
+        LOG_WEBSERIALLN("Failed to set LED at address 0x" + String(address, HEX) + " index " + String(index));
+        return;
     }
-    debugPrint(message);
-}
-
-bool DeviceBusClient::executeCommand(uint8_t cmd, const uint8_t *data, uint8_t data_len, uint8_t *rx_data, uint8_t &rx_len)
-{
-    // Prepare command
-    tx_buffer_[0] = cmd;
-    if (data && data_len > 0)
-    {
-        memcpy(&tx_buffer_[1], data, data_len);
-    }
-
-    // Send command
-    config_.wire_instance->beginTransmission(config_.slave_address);
-    config_.wire_instance->write(tx_buffer_, data_len + 1);
-    if (config_.wire_instance->endTransmission() != 0)
-    {
-        // debug
-        debugPrint("I2C error: Failed to send command");
-        setError(DeviceBusStatus::I2C_ERROR, "Failed to send command");
-        return false;
-    }
-
-    // Request response
-    config_.wire_instance->requestFrom(config_.slave_address, (uint8_t)I2C_DEVICE_BUS_BUFFER_SIZE);
-
-    // Read response
-    rx_len = 0;
-    while (config_.wire_instance->available() && rx_len < I2C_DEVICE_BUS_BUFFER_SIZE)
-    {
-        rx_data[rx_len++] = config_.wire_instance->read();
-    }
-
-    if (rx_len == 0)
-    {
-        debugPrint("I2C error: No response received");
-        setError(DeviceBusStatus::TIMEOUT, "No response received");
-        return false;
-    }
-
-    return true;
+    LOG_WEBSERIALLN("Set LED at address 0x" + String(address, HEX) + " index " + String(index) +
+                    " to color (" + String(color.r) + ", " + String(color.g) + ", " + String(color.b) + ")");
+    return;
 }

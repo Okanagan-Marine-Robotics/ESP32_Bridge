@@ -7,6 +7,17 @@
 #include "configuration.h"
 #include "driver/uart.h"
 
+SerialIO serialio;
+
+void serialTask(void *parameter)
+{
+    for (;;)
+    {
+        serialio.updateSubscribers(); // Process incoming serial data
+        vTaskDelay(pdMS_TO_TICKS(1)); // Delay to prevent busy-waiting
+    }
+}
+
 void SerialIO::subscribe(uint8_t channel, Callback cb)
 {
     _callbacks[channel] = cb;

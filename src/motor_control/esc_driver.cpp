@@ -35,3 +35,18 @@ void ESCDriver::setThrottle(float percent, bool bidirectional, float min_us, flo
     uint32_t duty = static_cast<uint32_t>((us * max_duty * freq_hz_) / 1000000.0f);
     ledcWrite(channel_, duty);
 }
+
+void ESCDriver::setDutyUs(uint32_t set_us)
+{
+    // Ensure the set_us is within the valid range
+    if (set_us < ESC_MIN || set_us > ESC_MAX)
+    {
+        LOG_WEBSERIALLN("setDutyUs: Value out of range, must be between ESC_MIN and ESC_MAX");
+        return;
+    }
+
+    // Convert microseconds to duty cycle
+    uint32_t max_duty = (1 << resolution_bits_) - 1;
+    uint32_t duty = static_cast<uint32_t>((set_us * max_duty * freq_hz_) / 1000000.0f);
+    ledcWrite(channel_, duty);
+}

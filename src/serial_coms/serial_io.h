@@ -37,3 +37,5 @@ private:
     void onUartRx();
     RingBuffer _rxRing;
 };
+
+void serialTask(void *parameter);

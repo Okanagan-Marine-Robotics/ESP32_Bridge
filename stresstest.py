@@ -3,6 +3,7 @@ import argparse
 import seaport as sp
 import time
 import math
+import timeit
 
 
 def received(data):
@@ -27,12 +28,25 @@ def main():
     t = 0.0
     
     iter = 0
-    while True:
-        # Lerp motors between -1 and 1 using a sine wave
+    def loop_body():
+        nonlocal t
         for i in range(8):
-            motors[i] = math.sin(t + i)  # smoothly oscillates between -1 and 1
-        seaport.publish(1, {str(i): motors[i] for i in range(8)})
+            motors[i] = math.sin(t + i)
+        # seaport.publish(1, {str(i): motors[i] for i in range(8)})
+        seaport.publish(254, {'cmd': 'ping'})
         t += 0.02
+        # time.sleep(0.001)
+
+    # Benchmark the loop over 100 iterations
+    start_time = time.time()
+    for _ in range(1000):
+        loop_body()
+    end_time = time.time()
+    print(f"1000 iterations took {end_time - start_time:.6f} seconds")
+
+    # Continue with the infinite loop if needed
+    # while True:
+    #     loop_body()
     
         # seaport.publish(254, {'cmd': 'ping'})
         
