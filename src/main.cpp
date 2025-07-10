@@ -45,6 +45,29 @@ int webSerialVprintf(const char *fmt, va_list args)
 LedControl ledControl; // Create an instance of LedControl
 DeviceBus deviceBus;   // Create a global instance of DeviceBus
 
+void sensorBusTask()
+{
+    for (;;)
+    {
+        for (auto &address : deviceBus.getBoardAddresses())
+        {
+            deviceBus.setLED(address, {0, 0, 255});
+            DeviceBus::BME280Sensor result = deviceBus.getBME280Sensor(address);
+            vTaskDelay(pdMS_TO_TICKS(500));
+            deviceBus.setLED(address, {0, 0, 0});
+            vTaskDelay(pdMS_TO_TICKS(500));
+
+            JsonDocument doc;
+            doc["address"] = address;
+            doc["temperature"] = result.temperature;
+            doc["humidity"] = result.humidity;
+            doc["pressure"] = result.pressure;
+
+            serialio.publish(2, doc);
+        }
+    }
+}
+
 void setup()
 {
 
@@ -81,7 +104,17 @@ void setup()
 
     QueueHandle_t *motorTaskQueueHandle = setupMotorControl();         // Initialize motor control
     QueueHandle_t *signalingTaskQueueHandle = setupSignalingControl(); // Initialize signaling control
-                                                                       // create led blink task
+    // Create a FreeRTOS task for sensorBusTask
+    xTaskCreatePinnedToCore(
+        [](void *)
+        { sensorBusTask(); }, // Task function
+        "SensorBusTask",      // Name
+        4096,                 // Stack size
+        NULL,                 // Parameters
+        1,                    // Priority
+        NULL,                 // Task handle
+        1                     // Core
+    );
 
     serialio.subscribe(1, [motorTaskQueueHandle](const JsonDocument &doc)
                        {

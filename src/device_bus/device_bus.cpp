@@ -71,7 +71,7 @@ void DeviceBus::discover()
     }
 }
 
-SensorDevice DeviceBus::getSensorDevice(uint8_t address)
+DeviceBus::SensorDevice DeviceBus::getSensorDevice(uint8_t address)
 {
     SensorDevice device = {address, 0, 0, 0, 0, 0}; // Initialize with default values
     Wire.beginTransmission(address);
@@ -92,12 +92,6 @@ SensorDevice DeviceBus::getSensorDevice(uint8_t address)
                         String(device.bme280Sensors) + " BME280 sensors, " +
                         String(device.ledCount) + " LEDs.");
 
-        // Serial.println("Device at address 0x" + String(address, HEX) + " has " + String(device.digitalOutputs) + " digital outputs, " +
-        //                String(device.digitalInputs) + " digital inputs, " +
-        //                String(device.analogInputs) + " analog inputs, " +
-        //                String(device.bme280Sensors) + " BME280 sensors, " +
-        //                String(device.ledCount) + " LEDs.");
-
         // if we have 1 leds we set it to blue to indicate that the device is connected
         if (device.ledCount > 0)
         {
@@ -112,8 +106,171 @@ SensorDevice DeviceBus::getSensorDevice(uint8_t address)
     return device; // Return the device information
 };
 
+std::vector<uint8_t> DeviceBus::getBoardAddresses()
+{
+    std::vector<uint8_t> addresses;
+    for (const auto &device : sensorBoards)
+    {
+        addresses.push_back(device.address);
+    }
+    return addresses;
+}
+
+void DeviceBus::setDigitalOutput(uint8_t address, uint8_t index, bool value)
+{
+
+    auto it = std::find_if(sensorBoards.begin(), sensorBoards.end(),
+                           [address](const SensorDevice &dev)
+                           { return dev.address == address; });
+
+    if (it == sensorBoards.end())
+    {
+        LOG_WEBSERIALLN("No sensor board found at address 0x" + String(address, HEX));
+        return;
+    }
+
+    if (index >= it->digitalOutputs)
+    {
+        LOG_WEBSERIALLN("Invalid digital output index " + String(index) + " for device at address 0x" + String(address, HEX));
+        return;
+    }
+
+    Wire.beginTransmission(address);
+    Wire.write(0x01);
+    Wire.write(index);
+    Wire.write(value);
+    if (Wire.endTransmission() != 0)
+    {
+        LOG_WEBSERIALLN("Failed to set LED at address 0x" + String(address, HEX) + " index " + String(index));
+        return;
+    }
+}
+
+bool DeviceBus::getDigitalInput(uint8_t address, uint8_t index)
+{
+    auto it = std::find_if(sensorBoards.begin(), sensorBoards.end(),
+                           [address](const SensorDevice &dev)
+                           { return dev.address == address; });
+
+    if (it == sensorBoards.end())
+    {
+        LOG_WEBSERIALLN("No sensor board found at address 0x" + String(address, HEX));
+        return false;
+    }
+
+    if (index >= it->digitalOutputs)
+    {
+        LOG_WEBSERIALLN("Invalid digital input index " + String(index) + " for device at address 0x" + String(address, HEX));
+        return false;
+    }
+
+    Wire.beginTransmission(address);
+    Wire.write(0x02);
+    Wire.write(index);
+    Wire.endTransmission();
+    Wire.requestFrom(address, 1);
+    if (Wire.available() > 0)
+    {
+        return Wire.read();
+    }
+    return false;
+}
+
+int DeviceBus::getAnalogInput(uint8_t address, uint8_t index)
+{
+    auto it = std::find_if(sensorBoards.begin(), sensorBoards.end(),
+                           [address](const SensorDevice &dev)
+                           { return dev.address == address; });
+
+    if (it == sensorBoards.end())
+    {
+        LOG_WEBSERIALLN("No sensor board found at address 0x" + String(address, HEX));
+        return -1;
+    }
+
+    if (index >= it->analogInputs)
+    {
+        LOG_WEBSERIALLN("Invalid analog input index " + String(index) + " for device at address 0x" + String(address, HEX));
+        return -1;
+    }
+
+    Wire.beginTransmission(address);
+    Wire.write(0x03);
+    Wire.write(index);
+    Wire.endTransmission();
+    Wire.requestFrom(address, 2);
+
+    if (Wire.available() >= 2)
+    {
+        uint8_t high = Wire.read();
+        uint8_t low = Wire.read();
+        return (high << 8) | low;
+    }
+    return -1;
+}
+
+DeviceBus::BME280Sensor DeviceBus::getBME280Sensor(uint8_t address)
+{
+    auto it = std::find_if(sensorBoards.begin(), sensorBoards.end(),
+                           [address](const SensorDevice &dev)
+                           { return dev.address == address; });
+
+    if (it == sensorBoards.end())
+    {
+        LOG_WEBSERIALLN("No sensor board found at address 0x" + String(address, HEX));
+        return {0, 0, 0};
+    }
+
+    Wire.beginTransmission(address);
+    Wire.write(0x04); // Command to read BME280 sensor
+    Wire.endTransmission();
+
+    BME280Sensor sensor = {0, 0, 0};
+    Wire.requestFrom(address, 12);
+    if (Wire.available() >= 12)
+    {
+        uint8_t buffer[12];
+        Wire.readBytes(buffer, 12);
+
+        // Decode 3 floats from the buffer
+        memcpy(&sensor.humidity, buffer, 4);
+        memcpy(&sensor.temperature, buffer + 4, 4);
+        memcpy(&sensor.pressure, buffer + 8, 4);
+
+        LOG_WEBSERIALLN("BME280 at address 0x" + String(address, HEX) +
+                        " -> Hum: " + String(sensor.humidity) +
+                        ", Temp: " + String(sensor.temperature) +
+                        ", Press: " + String(sensor.pressure));
+    }
+    else
+    {
+        LOG_WEBSERIALLN("Failed to read BME280 sensor data from address 0x" + String(address, HEX));
+    }
+    return sensor;
+}
+
 void DeviceBus::setLED(uint8_t address, RGB color, uint8_t index)
 {
+
+    // check to see if this is possible
+    // Find the sensor board for the given address
+    auto it = std::find_if(sensorBoards.begin(), sensorBoards.end(),
+                           [address](const SensorDevice &dev)
+                           { return dev.address == address; });
+
+    if (it == sensorBoards.end())
+    {
+        LOG_WEBSERIALLN("No sensor board found at address 0x" + String(address, HEX));
+        return;
+    }
+
+    // Check if the index is within the available LED count
+    if (index >= it->ledCount)
+    {
+        LOG_WEBSERIALLN("Invalid LED index " + String(index) + " for device at address 0x" + String(address, HEX));
+        return;
+    }
+
     Wire.beginTransmission(address);
     Wire.write(0x05);    // Command to set LED color
     Wire.write(index);   // LED index

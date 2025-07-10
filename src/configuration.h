@@ -31,7 +31,7 @@ extern WebSerial webSerial; // Forward declaration for WebSerial
 /**********************
  * WIFI CONFIGURATION *
  **********************/
-#define WIFI_ENABLED false // Enable/disable WiFi
+#define WIFI_ENABLED true // Enable/disable WiFi
 
 #if WIFI_ENABLED
 #define WIFI_SSID "ESP Bridge"   // WiFi SSID
@@ -41,7 +41,7 @@ extern WebSerial webSerial; // Forward declaration for WebSerial
 /***************************
  * WEBSERIAL CONFIGURATION *
  ***************************/
-#define USE_WEBSERIAL false    // Enable/disable WebSerial debug
+#define USE_WEBSERIAL true     // Enable/disable WebSerial debug
 #define LOG_LEVEL ESP_LOG_INFO // Default log level for WebSerial
 
 #if !WIFI_ENABLED && USE_WEBSERIAL
@@ -89,4 +89,4 @@ extern WebSerial webSerial; // Forward declaration for WebSerial
 /*************************
  * GENERAL CONFIGURATION *
  *************************/
-#define STARTUP_DELAY 1 // Startup delay in seconds to allow devices to connect to the WiFi network for logging
+#define STARTUP_DELAY 10 // Startup delay in seconds to allow devices to connect to the WiFi network for logging
