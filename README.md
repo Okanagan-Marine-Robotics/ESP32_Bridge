@@ -63,6 +63,57 @@ This happens in the opposite direction as well, where the data is received and t
 
 To interact with the ESP32 Bridge from a host computer, you can use the [SeaPortPy](https://github.com/Okanagan-Marine-Robotics/SeaPortPy/tree/main) Python library. SeaPortPy provides a convenient API for sending and receiving messages over the serial connection, handling encoding and decoding automatically.
 
+## Devices and Sensors
+
+The ESP32 Bridge supports various devices and sensors, which communicate over up to 255 different channels.
+Due to serial communication limitations, we try to keep the data size as small as possible so the shortest possible JSON structure is used. Eg. instead of using "temperature" we use "t".
+
+- Channel 1: motor control (ESCs)
+  - Define the json structure as so
+  ```json
+  {"0": value,
+   "1": value,
+   ...
+  }
+  ```
+  here the key is the ESC number and the value is the speed which can be a float between -1.0 and 1.0 or a pwm value depending on the configuration.
+- Channel 2: BME280 environmental sensor
+  - The BME280 sensor provides temperature, humidity, and pressure data. The data is published in JSON format with the following structure:
+    ```json
+    {
+      "a": 0, // Address of the sensor (0 for built-in sensor) Otherwise returns the address of the sensor board
+      "t": 22.5, // Temperature in Celsius
+      "h": 45.0, // Humidity in percentage
+      "p": 692029 // Pressure in Pascals
+    }
+    ```
+- Channel 3: BMI088 IMU Accelerometer
+  - This channel is responsible exclusively for the BMI088 IMU accelerometer data. The data is published in JSON format with the following structure:
+    ```json
+    {
+      "x": 0.0, // Acceleration in X direction in m/s^2
+      "y": 0.0, // Acceleration in Y direction in m/s^2
+      "z": 0.0 // Acceleration in Z direction in m/s^2
+    }
+    ```
+- Channel 4: BMI088 IMU Gyroscope
+  - This channel is responsible exclusively for the BMI088 IMU gyroscope data. The data is published in JSON format with the following structure:
+    ```json
+    {
+      "x": 0.0, // Angular velocity in X direction in rad/s
+      "y": 0.0, // Angular velocity in Y direction in rad/s
+      "z": 0.0 // Angular velocity in Z direction in rad/s
+    }
+    ```
+- Channel 5: BMI088 IMU Meta
+  - This channel is responsible for the BMI088 IMU metadata, including temperature and current time. The data is published in JSON format with the following structure:
+    ```json
+    {
+      "t": 25.0, // Temperature in Celsius
+      "c": 1234567890123 // Current timestamp in picoseconds
+    }
+    ```
+
 ### Installation
 
 Install SeaPortPy using pip:

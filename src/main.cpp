@@ -49,22 +49,50 @@ void sensorBusTask()
 {
     for (;;)
     {
+        // Read the sensors from the device bus and publish the data
         for (auto &address : deviceBus.getBoardAddresses())
         {
-            deviceBus.setLED(address, {0, 0, 255});
+            deviceBus.setLED(address, {0, 0, 15});
             DeviceBus::BME280Sensor result = deviceBus.getBME280Sensor(address);
-            vTaskDelay(pdMS_TO_TICKS(500));
+            vTaskDelay(pdMS_TO_TICKS(50));
             deviceBus.setLED(address, {0, 0, 0});
-            vTaskDelay(pdMS_TO_TICKS(500));
+            vTaskDelay(pdMS_TO_TICKS(50));
 
             JsonDocument doc;
-            doc["address"] = address;
-            doc["temperature"] = result.temperature;
-            doc["humidity"] = result.humidity;
-            doc["pressure"] = result.pressure;
+            doc["a"] = address;
+            doc["t"] = result.temperature;
+            doc["h"] = result.humidity;
+            doc["p"] = result.pressure;
 
             serialio.publish(2, doc);
         }
+
+        // Read the built-in BME280 sensor
+        DeviceBus::BME280Sensor result = deviceBus.getBME280Sensor(0);
+        JsonDocument doc;
+        doc["a"] = 0; // Built-in sensor address
+        doc["t"] = result.temperature;
+        doc["h"] = result.humidity;
+        doc["p"] = result.pressure;
+        serialio.publish(2, doc);
+
+        // Read the BMI088 sensor data
+        DeviceBus::Bmi088Data bmiData = deviceBus.getBmi088Sensor();
+        JsonDocument bmiDocAccel;
+        bmiDocAccel["x"] = bmiData.accel.x;
+        bmiDocAccel["y"] = bmiData.accel.y;
+        bmiDocAccel["z"] = bmiData.accel.z;
+        JsonDocument bmiDocGyro;
+        bmiDocGyro["x"] = bmiData.gyro.x;
+        bmiDocGyro["y"] = bmiData.gyro.y;
+        bmiDocGyro["z"] = bmiData.gyro.z;
+        JsonDocument tempDoc;
+        tempDoc["t"] = bmiData.temperature;
+        tempDoc["c"] = bmiData.time;
+
+        serialio.publish(3, bmiDocAccel);
+        serialio.publish(4, bmiDocGyro);
+        serialio.publish(5, tempDoc);
     }
 }
 

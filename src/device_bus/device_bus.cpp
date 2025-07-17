@@ -6,6 +6,12 @@ void DeviceBus::setup()
     Wire.begin();
     Wire.setClock(100000); // Set I2C clock speed to 100kHz
 
+    bme280.begin(ENVIRONMENTAL_SENSOR_ADDRESS);                            // Initialize the built-in BME280 sensor
+    bmi088 = new Bmi088(Wire, ACCELEROMETER_ADDRESS, GYRO_ADDRESS);        // Initialize the BMI088 sensor with I2C addresses
+    bmi088->begin();                                                       // Start the BMI088 sensor
+    bmi088->setOdr(Bmi088::ODR_1000HZ);                                    // Set the output data rate to 1000Hz
+    bmi088->setRange(Bmi088::ACCEL_RANGE_24G, Bmi088::GYRO_RANGE_2000DPS); // Set accelerometer and gyroscope ranges
+
     // Scan for devices on the bus
     for (uint8_t address = 1; address < 127; ++address)
     {
@@ -211,6 +217,21 @@ int DeviceBus::getAnalogInput(uint8_t address, uint8_t index)
 
 DeviceBus::BME280Sensor DeviceBus::getBME280Sensor(uint8_t address)
 {
+    if (address == 0)
+    {
+        // if no address is specified, we return the built-in sensor
+        address = ENVIRONMENTAL_SENSOR_ADDRESS;
+        LOG_WEBSERIALLN("No address specified, using built-in environmental sensor at address 0x" + String(address, HEX));
+        BME280Sensor sensor = {0, 0, 0};
+        sensor.humidity = bme280.readHumidity();
+        sensor.temperature = bme280.readTemperature();
+        sensor.pressure = bme280.readPressure();
+        LOG_WEBSERIALLN("Built-in BME280 -> Hum: " + String(sensor.humidity) +
+                        ", Temp: " + String(sensor.temperature) +
+                        ", Press: " + String(sensor.pressure));
+        return sensor;
+    }
+
     auto it = std::find_if(sensorBoards.begin(), sensorBoards.end(),
                            [address](const SensorDevice &dev)
                            { return dev.address == address; });
@@ -285,4 +306,33 @@ void DeviceBus::setLED(uint8_t address, RGB color, uint8_t index)
     LOG_WEBSERIALLN("Set LED at address 0x" + String(address, HEX) + " index " + String(index) +
                     " to color (" + String(color.r) + ", " + String(color.g) + ", " + String(color.b) + ")");
     return;
+}
+
+DeviceBus::Bmi088Data DeviceBus::getBmi088Sensor()
+{
+
+    Bmi088Data data;
+
+    if (bmi088 == nullptr)
+    {
+        LOG_WEBSERIALLN("BMI088 sensor not initialized.");
+        return {};
+    }
+
+    bmi088->readSensor(); // Read the sensor data
+
+    data.accel.x = bmi088->getAccelX_mss();
+    data.accel.y = bmi088->getAccelY_mss();
+    data.accel.z = bmi088->getAccelZ_mss();
+    data.gyro.x = bmi088->getGyroX_rads();
+    data.gyro.y = bmi088->getGyroY_rads();
+    data.gyro.z = bmi088->getGyroZ_rads();
+    data.temperature = bmi088->getTemperature_C();
+    data.time = bmi088->getTime_ps();
+
+    LOG_WEBSERIALLN("BMI088 -> Accel: (" + String(data.accel.x) + ", " + String(data.accel.y) + ", " + String(data.accel.z) +
+                    "), Gyro: (" + String(data.gyro.x) + ", " + String(data.gyro.y) + ", " + String(data.gyro.z) +
+                    "), Temp: " + String(data.temperature) + ", Time: " + String(data.time));
+
+    return data;
 }
