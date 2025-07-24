@@ -54,7 +54,7 @@ def sensor_data_received(data):
         sensor_data[address]['pressure'].append(data["p"])
         sensor_data[address]['timestamps'].append(timestamp)
         
-        print(f"Stored data for address {address}: T={data['t']}°C, H={data['h']}%, P={data['p']} Pa")
+        # print(f"Stored data for address {address}: T={data['t']}°C, H={data['h']}%, P={data['p']} Pa")
         
         # Update any active realtime windows
         update_realtime_displays()
@@ -611,10 +611,10 @@ def main():
     
     ser = serial.Serial(args.serial_port, args.baudrate, timeout=1)
     seaport = SeaPort(ser)
-    seaport.subscribe(254, lambda data: received(data), debug=True)
+    seaport.subscribe(254, lambda data: received(data), debug=False)
     
     # Subscribe to channel 2 for sensor data
-    seaport.subscribe(2, lambda data: sensor_data_received(data), debug=True)
+    seaport.subscribe(2, lambda data: sensor_data_received(data), debug=False)
 
     # create a simple GUI to allow for a user to send commands
     root = tk.Tk()

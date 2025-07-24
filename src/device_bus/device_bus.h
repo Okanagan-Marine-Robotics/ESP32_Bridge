@@ -64,6 +64,23 @@ public:
         Bmi088Data() : accel(), gyro(), temperature(0.0f), time(0) {}
     };
 
+    struct InputConfig
+    {
+        uint32_t samplingIntervalMs;
+        bool enabled;
+        uint32_t lastSampleTime;
+        String inputName; // Optional name for the input
+    };
+
+    struct BoardSensorConfig
+    {
+        uint8_t address;
+        std::vector<InputConfig> analogInputs;
+        std::vector<InputConfig> digitalInputs;
+        InputConfig bme280Config;
+        bool hasBME280;
+    };
+
     // functions to interact with devices
     void setDigitalOutput(uint8_t address, uint8_t index, bool value = false); // we set default to false so if we forget to set a value, it will default to off
     bool getDigitalInput(uint8_t address, uint8_t index);
@@ -75,12 +92,12 @@ public:
 
     void setLED(uint8_t address, RGB color, uint8_t index = 0); // Set LED color at index for device at address (default to first LED if index is not specified)
     std::vector<uint8_t> getBoardAddresses();
+    SensorDevice getSensorDevice(uint8_t address);
 
 private:
     std::vector<uint8_t> potentialAddresses; // Store discovered device addresses
     std::vector<SensorDevice> sensorBoards;  // Store discovered sensor devices
 
-    SensorDevice getSensorDevice(uint8_t address);
     Adafruit_BME280 bme280;   // BME280 sensor built-in instance
     Bmi088 *bmi088 = nullptr; // BMI088 sensor pointer, to be initialized later
 };

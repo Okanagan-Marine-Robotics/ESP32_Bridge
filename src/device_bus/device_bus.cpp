@@ -309,6 +309,7 @@ void DeviceBus::setLED(uint8_t address, RGB color, uint8_t index)
 }
 
 DeviceBus::Bmi088Data DeviceBus::getBmi088Sensor()
+
 {
 
     Bmi088Data data;

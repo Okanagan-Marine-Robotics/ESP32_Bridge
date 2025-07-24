@@ -106,11 +106,33 @@ Due to serial communication limitations, we try to keep the data size as small a
     }
     ```
 - Channel 5: BMI088 IMU Meta
+
   - This channel is responsible for the BMI088 IMU metadata, including temperature and current time. The data is published in JSON format with the following structure:
     ```json
     {
       "t": 25.0, // Temperature in Celsius
       "c": 1234567890123 // Current timestamp in picoseconds
+    }
+    ```
+
+- Channel 6: Analog Inputs
+
+  - This channel is used for reading analog inputs from the sensor boards. The data is published in JSON format with the following structure:
+    ```json
+    {
+      "a": 46, // Address of the sensor board
+      "i": 1, // Index of the input used to identify the input of the board can vary depending on the board
+      "v": 1023 // Analog value for the input (0-4095)
+    }
+    ```
+
+- Channel 7: Digital Inputs
+  - This channel is used for reading digital inputs from the sensor boards. The data is published in JSON format with the following structure:
+    ```json
+    {
+      "a": 46, // Address of the sensor board
+      "i": 1, // Index of the input used to identify the input of the board can vary depending on the board
+      "v": 1 // Digital value for the input (0 or 1)
     }
     ```
 
