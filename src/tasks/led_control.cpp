@@ -24,7 +24,7 @@ void LedControl::setup()
         this,
         1,
         nullptr,
-        0);
+        1);
 }
 
 void LedControl::ledBlinkTaskWrapper(void *parameter)
@@ -39,9 +39,9 @@ void LedControl::ledBlinkTask()
     {
         // Blink the LEDs
         FastLED.showColor(CRGB::Red);
-        delay(500);
+        vTaskDelay(pdMS_TO_TICKS(500));
         FastLED.clear();
         FastLED.show();
-        delay(500);
+        vTaskDelay(pdMS_TO_TICKS(500));
     }
 }

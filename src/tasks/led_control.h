@@ -1,5 +1,6 @@
 #pragma once
 #include <Arduino.h>
+#define FASTLED_INTERRUPT_RETRY_COUNT 3
 #include <FastLED.h>
 #include "configuration.h"
 

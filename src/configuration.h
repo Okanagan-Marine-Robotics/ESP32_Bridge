@@ -17,7 +17,7 @@ extern WebSerial webSerial; // Forward declaration for WebSerial
  * ESC CONFIGURATION *
  *********************/
 #define NUM_ESC 8                                 // Number of ESCs
-#define ESC_PINS {12, 13, 14, 15, 16, 17, 18, 19} // ESC control pins
+#define ESC_PINS {13, 12, 14, 15, 16, 17, 18, 19} // ESC control pins
 #define ESC_PWM_FREQUENCY 400                     // PWM frequency in Hz
 #define ESC_PWM_RESOLUTION 16                     // PWM resolution in bits
 #define ESC_BIDIRECTIONAL true                    // Bidirectional throttle support
@@ -31,7 +31,7 @@ extern WebSerial webSerial; // Forward declaration for WebSerial
 /**********************
  * WIFI CONFIGURATION *
  **********************/
-#define WIFI_ENABLED true // Enable/disable WiFi
+#define WIFI_ENABLED false // Enable/disable WiFi
 
 #if WIFI_ENABLED
 #define WIFI_SSID "ESP Bridge"   // WiFi SSID
@@ -41,7 +41,7 @@ extern WebSerial webSerial; // Forward declaration for WebSerial
 /***************************
  * WEBSERIAL CONFIGURATION *
  ***************************/
-#define USE_WEBSERIAL true     // Enable/disable WebSerial debug
+#define USE_WEBSERIAL false     // Enable/disable WebSerial debug
 #define LOG_LEVEL ESP_LOG_INFO // Default log level for WebSerial
 
 #if !WIFI_ENABLED && USE_WEBSERIAL
@@ -89,4 +89,4 @@ extern WebSerial webSerial; // Forward declaration for WebSerial
 /*************************
  * GENERAL CONFIGURATION *
  *************************/
-#define STARTUP_DELAY 10 // Startup delay in seconds to allow devices to connect to the WiFi network for logging
+#define STARTUP_DELAY 0 // Startup delay in seconds to allow devices to connect to the WiFi network for logging
